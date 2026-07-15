@@ -1,0 +1,338 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  CASHIER
+}
+
+enum OrderChannel {
+  ONLINE
+  POS
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  WALLET
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum AddressType {
+  SHIPPING
+  BILLING
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  email     String?  @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders    Order[]  @relation("OrderCreatedBy")
+  refunds   Refund[] @relation("RefundProcessedBy")
+
+  @@map("users")
+}
+
+model Customer {
+  id        String    @id @default(uuid())
+  name      String
+  email     String?   @unique
+  phone     String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  orders    Order[]
+  addresses Address[]
+  reviews   Review[]
+
+  @@map("customers")
+}
+
+model Address {
+  id         String      @id @default(uuid())
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  type       AddressType @default(SHIPPING)
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String      @default("India")
+  isDefault  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  orders     Order[]
+
+  @@map("addresses")
+}
+
+model Category {
+  id       String     @id @default(uuid())
+  name     String
+  slug     String     @unique
+  parentId String?
+  parent   Category?  @relation("CategoryToSubcategory", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryToSubcategory")
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                String    @id @default(uuid())
+  name              String
+  slug              String    @unique
+  description       String?
+  sku               String    @unique
+  price             Decimal   @db.Decimal(10, 2)
+  costPrice         Decimal?  @db.Decimal(10, 2)
+  images            String[]
+  isActive          Boolean   @default(true)
+  stock             Int       @default(0)
+  lowStockThreshold Int       @default(5)
+  categoryId        String?
+  category          Category? @relation(fields: [categoryId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  variants          ProductVariant[]
+  orderItems        OrderItem[]
+  reviews           Review[]
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  name       String
+  sku        String   @unique
+  price      Decimal  @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  attributeValues VariantAttributeValue[]
+
+  @@map("product_variants")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  rating     Int
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("reviews")
+}
+
+model Coupon {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  discountType  DiscountType
+  value         Decimal      @db.Decimal(10, 2)
+  minOrderValue Decimal?     @db.Decimal(10, 2)
+  maxUses       Int?
+  usedCount     Int          @default(0)
+  isActive      Boolean      @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime     @default(now())
+
+  orders        Order[]
+
+  @@map("coupons")
+}
+
+model Order {
+  id          String       @id @default(uuid())
+  orderNumber String       @unique
+  channel     OrderChannel @default(ONLINE)
+  status      OrderStatus  @default(PENDING)
+
+  customerId  String?
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+
+  createdById String?
+  createdBy   User?        @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  addressId   String?
+  address     Address?     @relation(fields: [addressId], references: [id])
+
+  couponId    String?
+  coupon      Coupon?      @relation(fields: [couponId], references: [id])
+
+  subtotal    Decimal      @db.Decimal(10, 2)
+  tax         Decimal      @default(0) @db.Decimal(10, 2)
+  discount    Decimal      @default(0) @db.Decimal(10, 2)
+  total       Decimal      @db.Decimal(10, 2)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  orderItems  OrderItem[]
+  payment     Payment?
+  refunds     Refund[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String          @id @default(uuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int
+  price     Decimal         @db.Decimal(10, 2)
+  subtotal  Decimal         @db.Decimal(10, 2)
+
+  @@map("order_items")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  orderId        String        @unique
+  order          Order         @relation(fields: [orderId], references: [id])
+  method         PaymentMethod
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal       @db.Decimal(10, 2)
+  transactionRef String?
+  createdAt      DateTime      @default(now())
+
+  @@map("payments")
+}
+
+model Refund {
+  id            String       @id @default(uuid())
+  orderId       String
+  order         Order        @relation(fields: [orderId], references: [id])
+  amount        Decimal      @db.Decimal(10, 2)
+  reason        String
+  status        RefundStatus @default(PENDING)
+  processedById String?
+  processedBy   User?        @relation("RefundProcessedBy", fields: [processedById], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("refunds")
+}
+
+model StoreSettings {
+  id           String   @id @default(uuid())
+  businessName String
+  logoUrl      String?
+  email        String?
+  phone        String?
+  address      String?
+  currency     String   @default("INR")
+  taxPercent   Decimal  @default(0) @db.Decimal(5, 2)
+  updatedAt    DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  role         Role
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+model Attribute {
+  id        String   @id @default(uuid())
+  name      String   @unique   // e.g. "Color", "Size"
+  createdAt DateTime @default(now())
+
+  values    AttributeValue[]
+
+  @@map("attributes")
+}
+
+model AttributeValue {
+  id          String    @id @default(uuid())
+  attributeId String
+  attribute   Attribute @relation(fields: [attributeId], references: [id])
+  value       String    // e.g. "Red", "M"
+
+  variantLinks VariantAttributeValue[]
+
+  @@unique([attributeId, value])
+  @@map("attribute_values")
+}
+
+model VariantAttributeValue {
+  id               String         @id @default(uuid())
+  variantId        String
+  variant          ProductVariant @relation(fields: [variantId], references: [id])
+  attributeValueId String
+  attributeValue   AttributeValue @relation(fields: [attributeValueId], references: [id])
+
+  @@unique([variantId, attributeValueId])
+  @@map("variant_attribute_values")
+}
