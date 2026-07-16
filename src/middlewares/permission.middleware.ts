@@ -5,25 +5,23 @@ export const checkPermission = (permissionKey: string) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ message: "Not authenticated" });
+        return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const rolePermission = await prisma.rolePermission.findFirst({
+      const hasPermission = await prisma.rolePermission.findFirst({
         where: {
           role: req.user.role,
-          permission: {
-            key: permissionKey,
-          },
+          permission: { key: permissionKey },
         },
       });
 
-      if (!rolePermission) {
+      if (!hasPermission) {
         return res.status(403).json({
           message: `You do not have permission to perform this action (${permissionKey})`,
         });
       }
 
-      next();
+      return next();
     } catch (error) {
       return res.status(500).json({ message: "Permission check failed" });
     }

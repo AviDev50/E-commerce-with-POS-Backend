@@ -9,6 +9,16 @@ const permissions = [
   { key: "product:read", description: "View products" },
   { key: "product:update", description: "Edit products" },
   { key: "product:delete", description: "Delete/deactivate products" },
+
+  { key: "attribute:create", description: "Create attributes and values" },
+  { key: "attribute:read", description: "View attributes and values" },
+  { key: "attribute:update", description: "Edit attributes and values" },
+  { key: "attribute:delete", description: "Delete attributes and values" },
+
+  { key: "category:create", description: "Create categories" },
+  { key: "category:read", description: "View categories" },
+  { key: "category:update", description: "Edit categories" },
+  { key: "category:delete", description: "Delete categories" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -16,6 +26,16 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "product:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "product:update": [Role.ADMIN, Role.MANAGER],
   "product:delete": [Role.ADMIN],
+
+  "attribute:create": [Role.ADMIN, Role.MANAGER],
+  "attribute:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "attribute:update": [Role.ADMIN, Role.MANAGER],
+  "attribute:delete": [Role.ADMIN, Role.MANAGER],
+
+  "category:create": [Role.ADMIN, Role.MANAGER],
+  "category:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "category:update": [Role.ADMIN, Role.MANAGER],
+  "category:delete": [Role.ADMIN],
 };
 
 async function main() {
