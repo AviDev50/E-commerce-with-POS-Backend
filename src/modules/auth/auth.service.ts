@@ -55,11 +55,11 @@ export const loginService = async (data: LoginInput) => {
     throw new Error("Invalid phone number or password");
   }
 
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: (process.env.JWT_EXPIRES_IN as string) || "7d" }
-  );
+const token = jwt.sign(
+  { id: user.id, role: user.role },
+  process.env.JWT_SECRET as string,
+  { expiresIn: (process.env.JWT_EXPIRES_IN || "7d") as jwt.SignOptions["expiresIn"] }
+);
 
   const { password, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };

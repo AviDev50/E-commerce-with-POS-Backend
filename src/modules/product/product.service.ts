@@ -1,0 +1,268 @@
+import prisma from "../../config/db";
+import { Prisma } from "@prisma/client";
+import { formatImageUrls } from "../../utils/formatImageUrl";
+
+interface CreateProductInput {
+  name: string;
+  slug?: string;
+  description?: string;
+  sku: string;
+  price: number;
+  costPrice?: number;
+  taxRate?: number;
+  categoryId?: string;
+  stock?: number;
+  lowStockThreshold?: number;
+  images: string[];
+}
+
+interface UpdateProductInput {
+  name?: string;
+  slug?: string;
+  description?: string;
+  sku?: string;
+  price?: number;
+  costPrice?: number;
+  taxRate?: number;
+  categoryId?: string;
+  stock?: number;
+  lowStockThreshold?: number;
+  images?: string[];
+  isActive?: boolean;
+}
+
+interface ProductListQuery {
+  page?: number;
+  limit?: number;
+  categoryId?: string;
+  search?: string;
+  includeInactive?: boolean;
+}
+
+interface AttributeInput {
+  attributeId: string;
+  value: string;
+}
+
+interface CreateVariantInput {
+  name: string;
+  sku: string;
+  price: number;
+  stock?: number;
+  attributes: AttributeInput[];
+}
+
+function generateSlug(input: string): string {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function withFullImageUrls<T extends { images: string[] }>(product: T) {
+  return { ...product, images: formatImageUrls(product.images) };
+}
+
+// ==================== PRODUCT SERVICES ====================
+
+export async function createProductService(data: CreateProductInput) {
+  const slug = generateSlug(data.slug || data.name);
+
+  const existingSku = await prisma.product.findUnique({ where: { sku: data.sku } });
+  if (existingSku) {
+    throw new Error("A product with this SKU already exists");
+  }
+
+  const existingSlug = await prisma.product.findUnique({ where: { slug } });
+  if (existingSlug) {
+    throw new Error("A product with this slug already exists");
+  }
+
+const product = await prisma.product.create({
+  data: {
+    name: data.name,
+    slug,
+    description: data.description,
+    sku: data.sku,
+    price: data.price,
+    costPrice: data.costPrice,
+    taxRate: data.taxRate,
+    categoryId: data.categoryId,
+    stock: data.stock ?? 0,
+    lowStockThreshold: data.lowStockThreshold ?? 5,
+    images: data.images,
+  },
+});
+
+return withFullImageUrls(product);
+}
+
+export async function getAllProductsService(query: ProductListQuery) {
+  const page = query.page && query.page > 0 ? query.page : 1;
+  const limit = query.limit && query.limit > 0 ? query.limit : 20;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.ProductWhereInput = {};
+
+  if (!query.includeInactive) {
+    where.isActive = true;
+  }
+
+  if (query.categoryId) {
+    where.categoryId = query.categoryId;
+  }
+
+  if (query.search) {
+    where.name = { contains: query.search, mode: "insensitive" };
+  }
+
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: { category: true },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+return {
+  products: products.map(withFullImageUrls),
+  pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+};
+}
+
+export async function getProductByIdService(id: string) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      category: true,
+      variants: {
+        include: {
+          attributeValues: {
+            include: { attributeValue: { include: { attribute: true } } },
+          },
+        },
+      },
+      reviews: true,
+    },
+  });
+
+if (!product) {
+  throw new Error("Product not found");
+}
+
+return withFullImageUrls(product);
+}
+
+export async function updateProductService(id: string, data: UpdateProductInput) {
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error("Product not found");
+  }
+
+  if (data.sku && data.sku !== existing.sku) {
+    const skuTaken = await prisma.product.findUnique({ where: { sku: data.sku } });
+    if (skuTaken) {
+      throw new Error("A product with this SKU already exists");
+    }
+  }
+
+  let slug = existing.slug;
+  if (data.slug) {
+    slug = generateSlug(data.slug);
+    const slugTaken = await prisma.product.findFirst({ where: { slug, NOT: { id } } });
+    if (slugTaken) {
+      throw new Error("A product with this slug already exists");
+    }
+  }
+
+  const updated = await prisma.product.update({ where: { id }, data: { ...data, slug } });
+return withFullImageUrls(updated);
+}
+
+export async function deleteProductService(id: string) {
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error("Product not found");
+  }
+
+  return prisma.product.update({ where: { id }, data: { isActive: false } });
+}
+
+// ==================== VARIANT SERVICES ====================
+
+export async function createVariantService(productId: string, data: CreateVariantInput) {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    throw new Error("Product not found");
+  }
+
+  const existingSku = await prisma.productVariant.findUnique({ where: { sku: data.sku } });
+  if (existingSku) {
+    throw new Error("A variant with this SKU already exists");
+  }
+
+  // Find-or-create har attribute value ke liye (jaisa humne discuss kiya tha)
+  const attributeValueIds: string[] = [];
+
+  for (const attr of data.attributes) {
+    const attribute = await prisma.attribute.findUnique({ where: { id: attr.attributeId } });
+    if (!attribute) {
+      throw new Error(`Attribute not found: ${attr.attributeId}`);
+    }
+
+    let attributeValue = await prisma.attributeValue.findFirst({
+      where: { attributeId: attr.attributeId, value: { equals: attr.value, mode: "insensitive" } },
+    });
+
+    if (!attributeValue) {
+      attributeValue = await prisma.attributeValue.create({
+        data: { attributeId: attr.attributeId, value: attr.value },
+      });
+    }
+
+    attributeValueIds.push(attributeValue.id);
+  }
+
+  return prisma.productVariant.create({
+    data: {
+      productId,
+      name: data.name,
+      sku: data.sku,
+      price: data.price,
+      stock: data.stock ?? 0,
+      attributeValues: {
+        create: attributeValueIds.map((attributeValueId) => ({ attributeValueId })),
+      },
+    },
+    include: {
+      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+    },
+  });
+}
+
+export async function getVariantsByProductService(productId: string) {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    throw new Error("Product not found");
+  }
+
+  return prisma.productVariant.findMany({
+    where: { productId },
+    include: {
+      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+    },
+  });
+}
+
+export async function deleteVariantService(variantId: string) {
+  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+  if (!existing) {
+    throw new Error("Variant not found");
+  }
+
+  return prisma.productVariant.delete({ where: { id: variantId } });
+}
