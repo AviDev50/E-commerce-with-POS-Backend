@@ -6,6 +6,6 @@ export const authorizeRoles = (...allowedRoles: Role[]) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ message: "You do not have permission to perform this action" });
     }
-    next();
+    return next();
   };
 };

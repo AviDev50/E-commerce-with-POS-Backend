@@ -52,6 +52,17 @@ interface CreateVariantInput {
   attributes: AttributeInput[];
 }
 
+interface AttributeGroup {
+  attributeId: string;
+  values: string[];
+}
+
+interface GenerateVariantsInput {
+  attributeGroups: AttributeGroup[];
+  basePrice: number;
+  baseStock?: number;
+}
+
 function generateSlug(input: string): string {
   return input
     .toLowerCase()
@@ -265,4 +276,87 @@ export async function deleteVariantService(variantId: string) {
   }
 
   return prisma.productVariant.delete({ where: { id: variantId } });
+}
+
+
+// Cartesian product helper — [[A,B],[X,Y]] → [[A,X],[A,Y],[B,X],[B,Y]]
+function cartesianProduct<T>(arrays: T[][]): T[][] {
+  return arrays.reduce<T[][]>(
+    (acc, curr) => acc.flatMap((combo) => curr.map((item) => [...combo, item])),
+    [[]]
+  );
+}
+
+export async function generateVariantsService(productId: string, data: GenerateVariantsInput) {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) {
+    throw new Error("Product not found");
+  }
+
+  if (!data.attributeGroups || data.attributeGroups.length === 0) {
+    throw new Error("At least one attribute group is required");
+  }
+
+  // Har attribute group ke liye find-or-create attribute values, IDs collect karo
+  const resolvedGroups: { attributeId: string; label: string; valueId: string }[][] = [];
+
+  for (const group of data.attributeGroups) {
+    const attribute = await prisma.attribute.findUnique({ where: { id: group.attributeId } });
+    if (!attribute) {
+      throw new Error(`Attribute not found: ${group.attributeId}`);
+    }
+
+    const groupItems = [];
+    for (const val of group.values) {
+      let attributeValue = await prisma.attributeValue.findFirst({
+        where: { attributeId: group.attributeId, value: { equals: val, mode: "insensitive" } },
+      });
+
+      if (!attributeValue) {
+        attributeValue = await prisma.attributeValue.create({
+          data: { attributeId: group.attributeId, value: val },
+        });
+      }
+
+      groupItems.push({ attributeId: group.attributeId, label: val, valueId: attributeValue.id });
+    }
+
+    resolvedGroups.push(groupItems);
+  }
+
+  // Saare combinations nikalo (Cartesian product)
+  const combinations = cartesianProduct(resolvedGroups);
+
+  const createdVariants = [];
+
+  for (const combo of combinations) {
+    const variantName = combo.map((c) => c.label).join(" - ");
+    const skuSuffix = combo.map((c) => c.label.toUpperCase().replace(/\s+/g, "")).join("-");
+    const sku = `${product.sku}-${skuSuffix}`;
+
+    const existingSku = await prisma.productVariant.findUnique({ where: { sku } });
+    if (existingSku) {
+      continue; // pehle se bana hua combination skip karo, duplicate error na aaye
+    }
+
+    const variant = await prisma.productVariant.create({
+      data: {
+        productId,
+        name: variantName,
+        sku,
+        price: data.basePrice,
+        stock: data.baseStock ?? 0,
+        attributeValues: {
+          create: combo.map((c) => ({ attributeValueId: c.valueId })),
+        },
+      },
+      include: {
+        attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+      },
+    });
+
+    createdVariants.push(variant);
+  }
+
+  return createdVariants;
 }

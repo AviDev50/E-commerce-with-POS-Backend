@@ -57,6 +57,11 @@ enum RefundStatus {
   COMPLETED
 }
 
+enum GstType {
+  INTRA_STATE
+  INTER_STATE
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -172,6 +177,7 @@ model Review {
   customer   Customer @relation(fields: [customerId], references: [id])
   rating     Int
   comment    String?
+  images     String[] 
   isApproved Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -200,16 +206,14 @@ model Order {
   orderNumber String       @unique
   channel     OrderChannel @default(ONLINE)
   status      OrderStatus  @default(PENDING)
+  gstType     GstType?
 
   customerId  String?
   customer    Customer?    @relation(fields: [customerId], references: [id])
-
   createdById String?
   createdBy   User?        @relation("OrderCreatedBy", fields: [createdById], references: [id])
-
   addressId   String?
   address     Address?     @relation(fields: [addressId], references: [id])
-
   couponId    String?
   coupon      Coupon?      @relation(fields: [couponId], references: [id])
 
@@ -229,21 +233,25 @@ model Order {
 }
 
 model OrderItem {
-  id        String          @id @default(uuid())
-  orderId   String
-  order     Order           @relation(fields: [orderId], references: [id])
-  productId String
-  product   Product         @relation(fields: [productId], references: [id])
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity  Int
-  price     Decimal         @db.Decimal(10, 2)
-  taxRate   Decimal         @default(0) @db.Decimal(5, 2)    // us waqt ka tax %
-  taxAmount Decimal         @default(0) @db.Decimal(10, 2)   // us waqt ka tax amount
-  subtotal  Decimal         @db.Decimal(10, 2)
+  id          String          @id @default(uuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id])
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity    Int
+  price       Decimal         @db.Decimal(10, 2)
+  taxRate     Decimal         @default(0) @db.Decimal(5, 2)
+  taxAmount   Decimal         @default(0) @db.Decimal(10, 2)
+  cgstAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  sgstAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  igstAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  subtotal    Decimal         @db.Decimal(10, 2)
 
   @@map("order_items")
 }
+
 model Payment {
   id             String        @id @default(uuid())
   orderId        String        @unique
@@ -279,6 +287,7 @@ model StoreSettings {
   email        String?
   phone        String?
   address      String?
+  state        String?
   currency     String   @default("INR")
   taxPercent   Decimal  @default(0) @db.Decimal(5, 2)
   updatedAt    DateTime @updatedAt
@@ -339,3 +348,4 @@ model VariantAttributeValue {
   @@unique([variantId, attributeValueId])
   @@map("variant_attribute_values")
 }
+

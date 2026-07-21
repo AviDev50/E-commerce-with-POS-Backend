@@ -150,3 +150,27 @@ export async function deleteVariant(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function generateVariants(req: Request, res: Response) {
+  try {
+    const productId = req.params.id as string;
+    const { attributeGroups, basePrice, baseStock } = req.body;
+
+    if (!attributeGroups || !basePrice) {
+      return res.status(400).json({ message: "attributeGroups and basePrice are required" });
+    }
+
+    const variants = await productService.generateVariantsService(productId, {
+      attributeGroups,
+      basePrice: Number(basePrice),
+      baseStock: baseStock ? Number(baseStock) : undefined,
+    });
+
+    return res.status(201).json({
+      message: `${variants.length} variants generated`,
+      data: variants,
+    });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}
