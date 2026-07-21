@@ -1,7 +1,10 @@
 import { PrismaClient, Role } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcrypt";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL as string });
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL as string,
+});
 const prisma = new PrismaClient({ adapter });
 
 const permissions = [
@@ -19,6 +22,21 @@ const permissions = [
   { key: "category:read", description: "View categories" },
   { key: "category:update", description: "Edit categories" },
   { key: "category:delete", description: "Delete categories" },
+
+  { key: "order:create:pos", description: "Create POS orders" },
+  { key: "order:read", description: "View orders" },
+  { key: "order:update", description: "Update order status" },
+  { key: "order:refund", description: "Refund orders" },
+
+  { key: "settings:update", description: "Update store settings" },
+
+  { key: "coupon:create", description: "Create coupons" },
+  { key: "coupon:read", description: "View coupons" },
+  { key: "coupon:update", description: "Edit coupons" },
+  { key: "coupon:delete", description: "Delete coupons" },
+
+  { key: "review:moderate", description: "Approve or reject reviews" },
+  { key: "review:delete", description: "Delete any review" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -36,7 +54,44 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "category:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "category:update": [Role.ADMIN, Role.MANAGER],
   "category:delete": [Role.ADMIN],
+
+  "order:create:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "order:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "order:update": [Role.ADMIN, Role.MANAGER],
+  "order:refund": [Role.ADMIN, Role.MANAGER],
+
+  "settings:update": [Role.ADMIN],
+
+  "coupon:create": [Role.ADMIN, Role.MANAGER],
+  "coupon:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "coupon:update": [Role.ADMIN, Role.MANAGER],
+  "coupon:delete": [Role.ADMIN, Role.MANAGER],
+
+  "review:moderate": [Role.ADMIN, Role.MANAGER],
+  "review:delete": [Role.ADMIN, Role.MANAGER],
 };
+
+async function seedBootstrapAdmin() {
+  const existingAdmin = await prisma.user.findFirst({ where: { role: Role.ADMIN } });
+
+  if (existingAdmin) {
+    console.log("ℹ️  Admin already exists, skipping bootstrap admin creation");
+    return;
+  }
+
+  const hashedPassword = await bcrypt.hash("Admin@123", 10);
+
+  await prisma.user.create({
+    data: {
+      name: "Default Admin",
+      phone: "9999999999",
+      password: hashedPassword,
+      role: Role.ADMIN,
+    },
+  });
+
+  console.log("Bootstrap admin created — phone: 9999999999, password: Admin@123");
+}
 
 async function main() {
   for (const perm of permissions) {
@@ -56,6 +111,9 @@ async function main() {
       });
     }
   }
+
+    await seedBootstrapAdmin();
+
 
   console.log("✅ Permissions seeded successfully");
 }

@@ -1,0 +1,15 @@
+import { Router } from "express";
+import * as addressController from "./address.controller";
+import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware";
+
+const router = Router();
+
+router.use(verifyCustomerToken); // saare routes customer-only hain
+
+router.post("/", addressController.createAddress);
+router.get("/", addressController.getMyAddresses);
+router.get("/:id", addressController.getAddressById);
+router.put("/:id", addressController.updateAddress);
+router.delete("/:id", addressController.deleteAddress);
+
+export default router;

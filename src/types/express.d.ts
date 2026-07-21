@@ -7,6 +7,9 @@ declare global {
         id: string;
         role: Role;
       };
+      customer?: {
+        id: string;
+      };
     }
   }
 }

@@ -8,6 +8,13 @@ import path from "path";
 import attributeRoutes from "./modules/attribute/attribute.routes";
 import productRoutes from "./modules/product/product.routes";
 import categoryRoutes from "./modules/category/category.routes";
+import orderRoutes from "./modules/order/order.routes";
+import addressRoutes from "./modules/address/address.routes";
+import settingsRoutes from "./modules/settings/settings.routes";
+import permissionRoutes from "./modules/permission/permission.routes";
+import couponRoutes from "./modules/coupon/coupon.routes";
+import reviewRoutes from "./modules/review/review.routes";
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +32,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/attributes", attributeRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/addresses", addressRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/permissions", permissionRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/reviews", reviewRoutes);
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
