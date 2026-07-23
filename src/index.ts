@@ -6,7 +6,7 @@ import cors from "cors";
 import authRoutes from "./modules/auth/auth.routes";
 import path from "path";
 import attributeRoutes from "./modules/attribute/attribute.routes";
-import productRoutes from "./modules/product/product.routes";
+import websiteProductRoutes from "./modules/product/product.routes";
 import categoryRoutes from "./modules/category/category.routes";
 import orderRoutes from "./modules/order/order.routes";
 import addressRoutes from "./modules/address/address.routes";
@@ -14,6 +14,8 @@ import settingsRoutes from "./modules/settings/settings.routes";
 import permissionRoutes from "./modules/permission/permission.routes";
 import couponRoutes from "./modules/coupon/coupon.routes";
 import reviewRoutes from "./modules/review/review.routes";
+import customerRoutes from "./modules/customer/customer.routes";
+import productRoutes from "./modules/product/product.routes";
 
 
 const app = express();
@@ -31,6 +33,7 @@ app.get("/health", (req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/attributes", attributeRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/websiteProducts", websiteProductRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/addresses", addressRoutes);
@@ -38,6 +41,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/customer", customerRoutes);
 
 
 app.listen(PORT, () => {
