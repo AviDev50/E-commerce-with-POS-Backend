@@ -75,21 +75,24 @@ model User {
 
   orders    Order[]  @relation("OrderCreatedBy")
   refunds   Refund[] @relation("RefundProcessedBy")
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
 
 model Customer {
-  id        String    @id @default(uuid())
-  name      String
-  email     String?   @unique
-  phone     String?   @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            String         @id @default(uuid())
+  name          String
+  phone         String         @unique
+  email         String?        @unique
+  password      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  orders    Order[]
-  addresses Address[]
-  reviews   Review[]
+  orders        Order[]
+  addresses     Address[]
+  reviews       Review[]
+  refreshTokens RefreshToken[]
 
   @@map("customers")
 }
@@ -349,3 +352,16 @@ model VariantAttributeValue {
   @@map("variant_attribute_values")
 }
 
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id])
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revoked    Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  @@map("refresh_tokens")
+}

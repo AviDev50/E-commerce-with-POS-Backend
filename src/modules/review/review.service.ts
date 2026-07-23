@@ -1,12 +1,14 @@
-import { array } from "node:stream/iter";
+//import { array } from "node:stream/iter";
 import prisma from "../../config/db";
-import { register } from "node:module";
+//import { register } from "node:module";
+import { formatImageUrls } from "../../utils/formatImageUrl";
 
 interface CreateReviewInput {
   productId: string;
   customerId: string;
   rating: number;
   comment?: string;
+  images: string[];
 }
 
 export async function createReviewService(data: CreateReviewInput) {
@@ -14,14 +16,10 @@ export async function createReviewService(data: CreateReviewInput) {
     throw new Error("Rating must be between 1 and 5");
   }
 
-  // Verified purchase check — customer ne is product ka koi COMPLETED order kiya ho
   const purchase = await prisma.orderItem.findFirst({
     where: {
       productId: data.productId,
-      order: {
-        customerId: data.customerId,
-        status: "COMPLETED",
-      },
+      order: { customerId: data.customerId, status: "COMPLETED" },
     },
   });
 
@@ -37,19 +35,22 @@ export async function createReviewService(data: CreateReviewInput) {
     throw new Error("You have already reviewed this product");
   }
 
-  return prisma.review.create({
+  const review = await prisma.review.create({
     data: {
       productId: data.productId,
       customerId: data.customerId,
       rating: data.rating,
       comment: data.comment,
-      isApproved: false, // moderation ke baad hi live hoga
+      images: data.images,
+      isApproved: false,
     },
   });
+
+  return { ...review, images: formatImageUrls(review.images) };
 }
 
 export async function getReviewsByProductService(productId: string, includeUnapproved: boolean) {
-  return prisma.review.findMany({
+  const reviews = await prisma.review.findMany({
     where: {
       productId,
       ...(includeUnapproved ? {} : { isApproved: true }),
@@ -57,6 +58,8 @@ export async function getReviewsByProductService(productId: string, includeUnapp
     include: { customer: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
+
+  return reviews.map((review) => ({ ...review, images: formatImageUrls(review.images) }));
 }
 
 export async function moderateReviewService(id: string, isApproved: boolean) {

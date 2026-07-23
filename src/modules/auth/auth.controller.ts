@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { registerService, loginService } from "./auth.service";
+import * as authService from "./auth.service";
 
-export const registerUser = async (req: Request, res: Response) => {
+export async function registerUser(req: Request, res: Response) {
   try {
     const { name, phone, email, password, role } = req.body;
 
@@ -11,7 +11,7 @@ export const registerUser = async (req: Request, res: Response) => {
       });
     }
 
-    const user = await registerService({ name, phone, email, password, role });
+    const user = await authService.registerService({ name, phone, email, password, role });
 
     return res.status(201).json({
       message: "User registered successfully",
@@ -20,9 +20,9 @@ export const registerUser = async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }
-};
+}
 
-export const loginUser = async (req: Request, res: Response) => {
+export async function loginUser(req: Request, res: Response) {
   try {
     const { phone, password } = req.body;
 
@@ -32,7 +32,7 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await loginService({ phone, password });
+    const result = await authService.loginService({ phone, password });
 
     return res.status(200).json({
       message: "Login successful",
@@ -41,4 +41,34 @@ export const loginUser = async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(401).json({ message: error.message });
   }
-};
+}
+
+export async function refreshAccessToken(req: Request, res: Response) {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "refreshToken is required" });
+    }
+
+    const result = await authService.refreshAccessTokenService(refreshToken);
+    return res.status(200).json({ message: "Token refreshed", data: result });
+  } catch (error: any) {
+    return res.status(401).json({ message: error.message });
+  }
+}
+
+export async function logoutUser(req: Request, res: Response) {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "refreshToken is required" });
+    }
+
+    const result = await authService.logoutService(refreshToken);
+    return res.status(200).json({ message: result.message });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}

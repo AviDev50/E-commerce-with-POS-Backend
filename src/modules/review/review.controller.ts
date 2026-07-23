@@ -9,11 +9,15 @@ export async function createReview(req: Request, res: Response) {
       return res.status(400).json({ message: "productId and rating are required" });
     }
 
+    const files = (req.files as Express.Multer.File[]) || [];
+    const images = files.map((file) => `/uploads/${file.filename}`);
+
     const review = await reviewService.createReviewService({
       productId,
       customerId: req.customer!.id,
       rating: Number(rating),
       comment,
+      images,
     });
 
     return res.status(201).json({
