@@ -1,7 +1,7 @@
 import { Router } from "express";
-import * as couponController from "./coupon.controller";
-import { verifyToken } from "../../middlewares/auth.middleware";
-import { checkPermission } from "../../middlewares/permission.middleware";
+import * as couponController from "./coupon.controller.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
+import { checkPermission } from "../../middlewares/permission.middleware.js";
 
 const router = Router();
 

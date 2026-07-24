@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as couponService from "./coupon.service";
+import * as couponService from "./coupon.service.js";
 
 export async function createCoupon(req: Request, res: Response) {
   try {

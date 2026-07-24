@@ -1,9 +1,9 @@
 import { Router } from "express";
-import * as productController from "./product.controller";
-import { verifyToken } from "../../middlewares/auth.middleware";
-import { checkPermission } from "../../middlewares/permission.middleware";
-import { optionalAuth } from "../../middlewares/optionalAuth.middleware";
-import { upload } from "../../middlewares/upload.middleware";
+import * as productController from "./product.controller.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
+import { checkPermission } from "../../middlewares/permission.middleware.js";
+import { optionalAuth } from "../../middlewares/optionalAuth.middleware.js";
+import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 
