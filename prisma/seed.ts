@@ -1,11 +1,8 @@
+import prisma from "../src/config/db";
 import { PrismaClient, Role } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcrypt";
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL as string,
-});
-const prisma = new PrismaClient({ adapter });
+//const prisma = new PrismaClient();
 
 const permissions = [
   { key: "product:create", description: "Create new products" },
