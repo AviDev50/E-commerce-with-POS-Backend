@@ -40,7 +40,7 @@ export const addAttributeValueService = async (data: CreateAttributeValueInput) 
   const existingValue = await prisma.attributeValue.findFirst({
     where: {
       attributeId: data.attributeId,
-      value: { equals: data.value, mode: "insensitive" },
+     value: { equals: data.value },
     },
   });
 
@@ -64,7 +64,7 @@ export const findOrCreateAttributeValueService = async (
   const existingValue = await prisma.attributeValue.findFirst({
     where: {
       attributeId,
-      value: { equals: value, mode: "insensitive" },
+      value: { equals: value},
     },
   });
 
