@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as websiteProductService from "./websiteProduct.service";
+import * as websiteProductService from "./websiteProduct.service.js";
 
 const RESERVED_QUERY_KEYS = ["category", "search", "minPrice", "maxPrice", "sort", "page", "limit"];
 

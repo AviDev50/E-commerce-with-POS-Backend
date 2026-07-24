@@ -1,4 +1,4 @@
-import prisma from "../../config/db"; // ⚠️ apna actual prisma import path daalo
+import prisma from "../../config/db.js"; // ⚠️ apna actual prisma import path daalo
 import { Prisma } from "@prisma/client";
 
 // Category + saare descendant category IDs nikalne ke liye (self-referential tree)

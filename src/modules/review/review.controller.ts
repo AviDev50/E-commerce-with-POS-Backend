@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as reviewService from "./review.service";
+import * as reviewService from "./review.service.js";
 
 export async function createReview(req: Request, res: Response) {
   try {

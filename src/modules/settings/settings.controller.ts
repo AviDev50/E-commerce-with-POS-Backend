@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as settingsService from "./settings.service";
+import * as settingsService from "./settings.service.js";
 
 export async function getStoreSettings(_req: Request, res: Response) {
   try {

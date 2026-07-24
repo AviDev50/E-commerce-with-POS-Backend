@@ -1,6 +1,6 @@
 import { Router } from "express";
-import * as addressController from "./address.controller";
-import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware";
+import * as addressController from "./address.controller.js";
+import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js";
 
 const router = Router();
 

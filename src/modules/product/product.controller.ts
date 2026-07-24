@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as productService from "./product.service";
+import * as productService from "./product.service.js";
 
 // ==================== PRODUCT CONTROLLERS ====================
 

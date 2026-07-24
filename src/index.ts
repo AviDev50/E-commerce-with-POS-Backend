@@ -3,33 +3,46 @@ dotenv.config();
 
 import express, { Request, Response } from "express";
 import cors from "cors";
-import authRoutes from "./modules/auth/auth.routes";
 import path from "path";
-import attributeRoutes from "./modules/attribute/attribute.routes";
-import websiteProductRoutes from "./modules/product/product.routes";
-import categoryRoutes from "./modules/category/category.routes";
-import orderRoutes from "./modules/order/order.routes";
-import addressRoutes from "./modules/address/address.routes";
-import settingsRoutes from "./modules/settings/settings.routes";
-import permissionRoutes from "./modules/permission/permission.routes";
-import couponRoutes from "./modules/coupon/coupon.routes";
-import reviewRoutes from "./modules/review/review.routes";
-import customerRoutes from "./modules/customer/customer.routes";
-import productRoutes from "./modules/product/product.routes";
+import { fileURLToPath } from "url";
 
+import authRoutes from "./modules/auth/auth.routes.js";
+import attributeRoutes from "./modules/attribute/attribute.routes.js";
+import productRoutes from "./modules/product/product.routes.js";
+import websiteProductRoutes from "./modules/product/product.routes.js";
+import categoryRoutes from "./modules/category/category.routes.js";
+import orderRoutes from "./modules/order/order.routes.js";
+import addressRoutes from "./modules/address/address.routes.js";
+import settingsRoutes from "./modules/settings/settings.routes.js";
+import permissionRoutes from "./modules/permission/permission.routes.js";
+import couponRoutes from "./modules/coupon/coupon.routes.js";
+import reviewRoutes from "./modules/review/review.routes.js";
+import customerRoutes from "./modules/customer/customer.routes.js";
+
+// __dirname replacement for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Static Files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+// Health Check
 app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({ status: "ok", message: "Server is running" });
+  res.status(200).json({
+    status: "ok",
+    message: "Server is running",
+  });
 });
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/attributes", attributeRoutes);
 app.use("/api/products", productRoutes);
@@ -43,7 +56,7 @@ app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/customer", customerRoutes);
 
-
+// Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

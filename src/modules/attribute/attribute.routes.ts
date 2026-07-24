@@ -5,9 +5,9 @@ import {
   addAttributeValue,
   deleteAttributeValue,
   deleteAttribute,
-} from "./attribute.controller";
-import { verifyToken } from "../../middlewares/auth.middleware";
-import { checkPermission } from "../../middlewares/permission.middleware";
+} from "./attribute.controller.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
+import { checkPermission } from "../../middlewares/permission.middleware.js";
 
 const router = Router();
 

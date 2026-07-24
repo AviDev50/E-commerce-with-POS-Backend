@@ -1,7 +1,7 @@
-import prisma from "../../config/db";
+import prisma from "../../config/db.js";
 import { Prisma, PaymentMethod, GstType } from "@prisma/client";
-import { calculateTaxBreakdown } from "../../utils/taxCalculator";
-import { generateOrderNumber } from "../../utils/orderNumberGenerator";
+import { calculateTaxBreakdown } from "../../utils/taxCalculator.js";
+import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 
 interface OrderItemInput {
   productId: string;

@@ -5,7 +5,7 @@ import {
   addAttributeValueService,
   deleteAttributeValueService,
   deleteAttributeService,
-} from "./attribute.service";
+} from "./attribute.service.js";
 
 export const createAttribute = async (req: Request, res: Response) => {
   try {

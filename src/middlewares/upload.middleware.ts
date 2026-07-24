@@ -1,7 +1,12 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { Request } from "express";
+
+// __dirname ESM mein available nahi hota — manually derive karna padta hai
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Ensure uploads folder exists
 const uploadDir = path.join(__dirname, "../uploads");
