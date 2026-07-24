@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 enum Role {
@@ -139,7 +139,7 @@ model Product {
   price             Decimal   @db.Decimal(10, 2)
   costPrice         Decimal?  @db.Decimal(10, 2)
   taxRate           Decimal?  @db.Decimal(5, 2)   // null = category ka rate use hoga
-  images            String[]
+  images            String?
   isActive          Boolean   @default(true)
   stock             Int       @default(0)
   lowStockThreshold Int       @default(5)
@@ -180,7 +180,7 @@ model Review {
   customer   Customer @relation(fields: [customerId], references: [id])
   rating     Int
   comment    String?
-  images     String[] 
+  images     String?
   isApproved Boolean  @default(false)
   createdAt  DateTime @default(now())
 

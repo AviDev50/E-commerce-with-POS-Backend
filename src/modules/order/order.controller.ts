@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import * as orderService from "./order.service";
-import { hasPermission } from "../../middlewares/permission.middleware";
+import * as orderService from "./order.service.js";
+import { hasPermission } from "../../middlewares/permission.middleware.js";
 
 export async function createPosOrder(req: Request, res: Response) {
   try {

@@ -1,4 +1,4 @@
-import prisma from "../../config/db";
+import prisma from "../../config/db.js";
 import { AddressType } from "@prisma/client";
 
 interface CreateAddressInput {

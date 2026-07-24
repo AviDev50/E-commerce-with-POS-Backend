@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as permissionService from "./permission.service";
+import * as permissionService from "./permission.service.js";
 import { Role } from "@prisma/client";
 
 export async function getAllPermissions(_req: Request, res: Response) {

@@ -1,11 +1,11 @@
 import { Router } from "express";
-import * as reviewController from "./review.controller";
-import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware";
+import * as reviewController from "./review.controller.js";
+import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js";
 //import { verifyAnyToken } from "../../middlewares/anyAuth.middleware";
-import { verifyToken } from "../../middlewares/auth.middleware";
-import { checkPermission } from "../../middlewares/permission.middleware";
-import { optionalAnyAuth } from "../../middlewares/optionalAnyAuth.middleware";
-import { upload } from "../../middlewares/upload.middleware";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
+import { checkPermission } from "../../middlewares/permission.middleware.js";
+import { optionalAnyAuth } from "../../middlewares/optionalAnyAuth.middleware.js";
+import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as addressService from "./address.service";
+import * as addressService from "./address.service.js";
 
 export async function createAddress(req: Request, res: Response) {
   try {

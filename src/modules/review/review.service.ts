@@ -1,7 +1,7 @@
 //import { array } from "node:stream/iter";
-import prisma from "../../config/db";
+import prisma from "../../config/db.js";
 //import { register } from "node:module";
-import { formatImageUrls } from "../../utils/formatImageUrl";
+import { formatImageUrls } from "../../utils/formatImageUrl.js";
 
 interface CreateReviewInput {
   productId: string;
