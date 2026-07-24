@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import prisma from "../config/db";
+import prisma from "../config/db.js";
 import { Role } from "@prisma/client";
 
 export async function hasPermission(role: Role, permissionKey: string): Promise<boolean> {

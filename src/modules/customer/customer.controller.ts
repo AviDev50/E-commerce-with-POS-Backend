@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import * as customerService from "./customer.service";
+import * as customerService from "./customer.service.js";
 
 export async function registerCustomer(req: Request, res: Response) {
   try {

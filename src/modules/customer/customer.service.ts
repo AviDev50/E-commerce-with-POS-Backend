@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import prisma from "../../config/db";
-import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken";
+import prisma from "../../config/db.js";
+import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken.js";
 
 interface RegisterInput {
   name: string;
