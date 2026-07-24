@@ -41,12 +41,12 @@ export async function createReviewService(data: CreateReviewInput) {
       customerId: data.customerId,
       rating: data.rating,
       comment: data.comment,
-      images: data.images,
+      images: JSON.stringify(data.images ?? []),
       isApproved: false,
     },
   });
 
-  return { ...review, images: formatImageUrls(review.images) };
+  return { ...review, images: formatImageUrls(review.images ? JSON.parse(review.images) : [])};
 }
 
 export async function getReviewsByProductService(productId: string, includeUnapproved: boolean) {
@@ -59,7 +59,7 @@ export async function getReviewsByProductService(productId: string, includeUnapp
     orderBy: { createdAt: "desc" },
   });
 
-  return reviews.map((review) => ({ ...review, images: formatImageUrls(review.images) }));
+  return reviews.map((review) => ({ ...review, images: formatImageUrls(review.images ? JSON.parse(review.images) : []) }));
 }
 
 export async function moderateReviewService(id: string, isApproved: boolean) {

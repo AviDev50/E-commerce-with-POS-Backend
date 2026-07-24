@@ -71,8 +71,13 @@ function generateSlug(input: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-function withFullImageUrls<T extends { images: string[] }>(product: T) {
-  return { ...product, images: formatImageUrls(product.images) };
+// function withFullImageUrls<T extends { images: string[] }>(product: T) {
+//   return { ...product, images: formatImageUrls(product.images) };
+// }
+
+function withFullImageUrls<T extends { images: string | null }>(product: T) {
+  const imagesArray: string[] = product.images ? JSON.parse(product.images) : [];
+  return { ...product, images: formatImageUrls(imagesArray) };
 }
 
 // ==================== PRODUCT SERVICES ====================
@@ -102,7 +107,7 @@ const product = await prisma.product.create({
     categoryId: data.categoryId,
     stock: data.stock ?? 0,
     lowStockThreshold: data.lowStockThreshold ?? 5,
-    images: data.images,
+    images: JSON.stringify(data.images ?? []),
   },
 });
 
@@ -125,7 +130,7 @@ export async function getAllProductsService(query: ProductListQuery) {
   }
 
   if (query.search) {
-    where.name = { contains: query.search, mode: "insensitive" };
+    where.name = { contains: query.search};
   }
 
   const [products, total] = await Promise.all([
@@ -190,8 +195,17 @@ export async function updateProductService(id: string, data: UpdateProductInput)
     }
   }
 
-  const updated = await prisma.product.update({ where: { id }, data: { ...data, slug } });
-return withFullImageUrls(updated);
+  // images ko alag nikaal lo, baaki sab spread kar do
+  const { images, ...rest } = data;
+
+  const updateData: Prisma.ProductUncheckedUpdateInput = {
+    ...rest,
+    slug,
+    ...(images ? { images: JSON.stringify(images) } : {}),
+  };
+
+  const updated = await prisma.product.update({ where: { id }, data: updateData });
+  return withFullImageUrls(updated);
 }
 
 export async function deleteProductService(id: string) {
@@ -226,7 +240,7 @@ export async function createVariantService(productId: string, data: CreateVarian
     }
 
     let attributeValue = await prisma.attributeValue.findFirst({
-      where: { attributeId: attr.attributeId, value: { equals: attr.value, mode: "insensitive" } },
+      where: { attributeId: attr.attributeId, value: { equals: attr.value} },
     });
 
     if (!attributeValue) {
@@ -309,7 +323,7 @@ export async function generateVariantsService(productId: string, data: GenerateV
     const groupItems = [];
     for (const val of group.values) {
       let attributeValue = await prisma.attributeValue.findFirst({
-        where: { attributeId: group.attributeId, value: { equals: val, mode: "insensitive" } },
+        where: { attributeId: group.attributeId, value: { equals: val} },
       });
 
       if (!attributeValue) {
