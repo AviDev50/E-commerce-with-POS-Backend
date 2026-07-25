@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 import authRoutes from "./modules/auth/auth.routes.js";
 import attributeRoutes from "./modules/attribute/attribute.routes.js";
 import productRoutes from "./modules/product/product.routes.js";
-import websiteProductRoutes from "./modules/product/product.routes.js";
+import websiteProductRoutes from "./modules/websiteProduct/websiteProduct.routes.js";
 import categoryRoutes from "./modules/category/category.routes.js";
 import orderRoutes from "./modules/order/order.routes.js";
 import addressRoutes from "./modules/address/address.routes.js";

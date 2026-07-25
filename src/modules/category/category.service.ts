@@ -1,10 +1,12 @@
 import prisma from "../../config/db.js";
+import { formatImageUrl } from "../../utils/formatImageUrl.js";
 
 interface CreateCategoryInput {
   name: string;
   slug?: string;
   parentId?: string;
   taxRate?: number;
+  image?: string;
 }
 
 interface UpdateCategoryInput {
@@ -12,6 +14,7 @@ interface UpdateCategoryInput {
   slug?: string;
   parentId?: string;
   taxRate?: number;
+  image?: string;
 }
 
 function generateSlug(input: string): string {
@@ -37,42 +40,40 @@ export async function createCategoryService(data: CreateCategoryInput) {
     }
   }
 
-  return prisma.category.create({
+  const category = await prisma.category.create({
     data: {
       name: data.name,
       slug,
       parentId: data.parentId,
       taxRate: data.taxRate,
+      image: data.image,
     },
   });
+
+  return { ...category, image: category.image ? formatImageUrl(category.image) : null };
 }
 
-export async function getAllCategoriesService() {
-  return prisma.category.findMany({
-    include: {
-      parent: true,
-      children: true,
-      _count: { select: { products: true } },
-    },
+export async function getAllCategoriesService(topLevelOnly?: boolean) {
+  const categories = await prisma.category.findMany({
+    where: topLevelOnly ? { parentId: null } : {},
+    include: { parent: true, children: true, _count: { select: { products: true } } },
     orderBy: { name: "asc" },
   });
+
+  return categories.map((cat) => ({ ...cat, image: cat.image ? formatImageUrl(cat.image) : null }));
 }
 
 export async function getCategoryByIdService(id: string) {
   const category = await prisma.category.findUnique({
     where: { id },
-    include: {
-      parent: true,
-      children: true,
-      _count: { select: { products: true } },
-    },
+    include: { parent: true, children: true, _count: { select: { products: true } } },
   });
 
   if (!category) {
     throw new Error("Category not found");
   }
 
-  return category;
+  return { ...category, image: category.image ? formatImageUrl(category.image) : null };
 }
 
 export async function updateCategoryService(id: string, data: UpdateCategoryInput) {
@@ -100,10 +101,12 @@ export async function updateCategoryService(id: string, data: UpdateCategoryInpu
     }
   }
 
-  return prisma.category.update({
+  const updated = await prisma.category.update({
     where: { id },
     data: { ...data, slug },
   });
+
+  return { ...updated, image: updated.image ? formatImageUrl(updated.image) : null };
 }
 
 export async function deleteCategoryService(id: string) {
@@ -126,3 +129,5 @@ export async function deleteCategoryService(id: string) {
 
   return prisma.category.delete({ where: { id } });
 }
+
+
