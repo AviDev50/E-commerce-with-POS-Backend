@@ -60,7 +60,17 @@ export async function getAllCategoriesService(topLevelOnly?: boolean) {
     orderBy: { name: "asc" },
   });
 
-  return categories.map((cat) => ({ ...cat, image: cat.image ? formatImageUrl(cat.image) : null }));
+  return categories.map((cat) => ({
+    ...cat,
+    image: cat.image ? formatImageUrl(cat.image) : null,
+    children: cat.children.map((child) => ({
+      ...child,
+      image: child.image ? formatImageUrl(child.image) : null,
+    })),
+    parent: cat.parent
+      ? { ...cat.parent, image: cat.parent.image ? formatImageUrl(cat.parent.image) : null }
+      : null,
+  }));
 }
 
 export async function getCategoryByIdService(id: string) {
@@ -73,7 +83,17 @@ export async function getCategoryByIdService(id: string) {
     throw new Error("Category not found");
   }
 
-  return { ...category, image: category.image ? formatImageUrl(category.image) : null };
+  return {
+    ...category,
+    image: category.image ? formatImageUrl(category.image) : null,
+    children: category.children.map((child) => ({
+      ...child,
+      image: child.image ? formatImageUrl(child.image) : null,
+    })),
+    parent: category.parent
+      ? { ...category.parent, image: category.parent.image ? formatImageUrl(category.parent.image) : null }
+      : null,
+  };
 }
 
 export async function updateCategoryService(id: string, data: UpdateCategoryInput) {
