@@ -55,4 +55,12 @@ router.delete(
   productController.deleteVariant,
 );
 
+router.put(
+  "/variants/:variantId",
+  verifyToken,
+  checkPermission("product:update"),
+  upload.array("images", 5),
+  productController.updateVariant
+);
+
 export default router;
