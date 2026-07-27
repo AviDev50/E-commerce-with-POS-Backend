@@ -174,3 +174,24 @@ export async function generateVariants(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function updateVariant(req: Request, res: Response) {
+  try {
+    const variantId = req.params.variantId as string;
+    const { name, price, stock } = req.body;
+
+    const files = (req.files as Express.Multer.File[]) || [];
+    const images = files.length > 0 ? files.map((file) => `/uploads/${file.filename}`) : undefined;
+
+    const variant = await productService.updateVariantService(variantId, {
+      name,
+      price: price ? Number(price) : undefined,
+      stock: stock ? Number(stock) : undefined,
+      images,
+    });
+
+    return res.status(200).json({ message: "Variant updated", data: variant });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}

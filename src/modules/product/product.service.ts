@@ -63,6 +63,14 @@ interface GenerateVariantsInput {
   baseStock?: number;
 }
 
+interface UpdateVariantInput {
+  name?: string;
+  price?: number;
+  stock?: number;
+  images?: string[];
+}
+
+
 function generateSlug(input: string): string {
   return input
     .toLowerCase()
@@ -230,7 +238,6 @@ export async function createVariantService(productId: string, data: CreateVarian
     throw new Error("A variant with this SKU already exists");
   }
 
-  // Find-or-create har attribute value ke liye (jaisa humne discuss kiya tha)
   const attributeValueIds: string[] = [];
 
   for (const attr of data.attributes) {
@@ -240,7 +247,7 @@ export async function createVariantService(productId: string, data: CreateVarian
     }
 
     let attributeValue = await prisma.attributeValue.findFirst({
-      where: { attributeId: attr.attributeId, value: { equals: attr.value} },
+      where: { attributeId: attr.attributeId, value: { equals: attr.value } },
     });
 
     if (!attributeValue) {
@@ -252,13 +259,14 @@ export async function createVariantService(productId: string, data: CreateVarian
     attributeValueIds.push(attributeValue.id);
   }
 
-  return prisma.productVariant.create({
+  const variant = await prisma.productVariant.create({
     data: {
       productId,
       name: data.name,
       sku: data.sku,
       price: data.price,
       stock: data.stock ?? 0,
+      images: JSON.stringify([]),
       attributeValues: {
         create: attributeValueIds.map((attributeValueId) => ({ attributeValueId })),
       },
@@ -267,6 +275,8 @@ export async function createVariantService(productId: string, data: CreateVarian
       attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
     },
   });
+
+  return { ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) };
 }
 
 export async function getVariantsByProductService(productId: string) {
@@ -275,12 +285,15 @@ export async function getVariantsByProductService(productId: string) {
     throw new Error("Product not found");
   }
 
-  return prisma.productVariant.findMany({
+  const variants = await prisma.productVariant.findMany({
     where: { productId },
-    include: {
-      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
-    },
+    include: { attributeValues: { include: { attributeValue: { include: { attribute: true } } } } },
   });
+
+  return variants.map((v) => ({
+    ...v,
+    images: formatImageUrls(JSON.parse(v.images || "[]")),
+  }));
 }
 
 export async function deleteVariantService(variantId: string) {
@@ -292,7 +305,27 @@ export async function deleteVariantService(variantId: string) {
   return prisma.productVariant.delete({ where: { id: variantId } });
 }
 
+export async function updateVariantService(variantId: string, data: UpdateVariantInput) {
+  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+  if (!existing) {
+    throw new Error("Variant not found");
+  }
 
+  const variant = await prisma.productVariant.update({
+    where: { id: variantId },
+    data: {
+      name: data.name,
+      price: data.price,
+      stock: data.stock,
+      images: data.images ? JSON.stringify(data.images) : undefined,
+    },
+    include: {
+      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+    },
+  });
+
+  return { ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) };
+}
 // Cartesian product helper — [[A,B],[X,Y]] → [[A,X],[A,Y],[B,X],[B,Y]]
 function cartesianProduct<T>(arrays: T[][]): T[][] {
   return arrays.reduce<T[][]>(
@@ -360,6 +393,7 @@ export async function generateVariantsService(productId: string, data: GenerateV
         sku,
         price: data.basePrice,
         stock: data.baseStock ?? 0,
+        images: JSON.stringify([]),
         attributeValues: {
           create: combo.map((c) => ({ attributeValueId: c.valueId })),
         },
@@ -369,7 +403,7 @@ export async function generateVariantsService(productId: string, data: GenerateV
       },
     });
 
-    createdVariants.push(variant);
+    createdVariants.push({ ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) });
   }
 
   return createdVariants;
