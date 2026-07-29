@@ -1,6 +1,7 @@
 import prisma from "../../config/db.js"; // ⚠️ apna actual prisma import path daalo
 import { Prisma } from "@prisma/client";
 import { formatImageUrl } from "../../utils/formatImageUrl.js"; // ⚠️ apna actual path daalo
+//import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
 
 function parseImages(images: any): string[] {
   if (Array.isArray(images)) return images;
