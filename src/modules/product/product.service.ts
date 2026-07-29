@@ -1,6 +1,6 @@
 import prisma from "../../config/db.js";
 import { Prisma } from "@prisma/client";
-import { formatImageUrls } from "../../utils/formatImageUrl.js";
+import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
 
 interface CreateProductInput {
   name: string;
@@ -170,9 +170,7 @@ export async function getProductByIdService(id: string) {
           },
         },
       },
-      reviews: {
-        include: { customer: { select: { id: true, name: true } } },
-      },
+      reviews: true,
     },
   });
 
@@ -180,15 +178,16 @@ export async function getProductByIdService(id: string) {
     throw new Error("Product not found");
   }
 
+  const formatted = withFullImageUrls(product);
+
   return {
-    ...withFullImageUrls(product),
+    ...formatted,
+    category: product.category
+      ? { ...product.category, image: product.category.image ? formatImageUrl(product.category.image) : null }
+      : null,
     variants: product.variants.map((v) => ({
       ...v,
       images: formatImageUrls(JSON.parse(v.images || "[]")),
-    })),
-    reviews: product.reviews.map((r) => ({
-      ...r,
-      images: formatImageUrls(JSON.parse(r.images || "[]")),
     })),
   };
 }
