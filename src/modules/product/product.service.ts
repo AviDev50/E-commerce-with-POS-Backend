@@ -1,6 +1,6 @@
 import prisma from "../../config/db.js";
 import { Prisma } from "@prisma/client";
-import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
+import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl.js";
 
 interface CreateProductInput {
   name: string;
