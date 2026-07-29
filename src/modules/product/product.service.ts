@@ -170,7 +170,11 @@ export async function getProductByIdService(id: string) {
           },
         },
       },
-      reviews: true,
+      reviews: {
+        include: {
+          customer: { select: { id: true, name: true } },
+        },
+      },
     },
   });
 
@@ -189,10 +193,18 @@ export async function getProductByIdService(id: string) {
       ...v,
       images: formatImageUrls(JSON.parse(v.images || "[]")),
     })),
-    reviews: product.reviews.map((r) => ({
-      ...r,
-      images: formatImageUrls(JSON.parse(r.images || "[]")),
-    })),
+    reviews: product.reviews.map((r) => {
+      const date = new Date(r.createdAt);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+
+      return {
+        ...r,
+        images: formatImageUrls(JSON.parse(r.images || "[]")),
+        createdAtFormatted: `${day}-${month}-${year}`,
+      };
+    }),
   };
 }
 
