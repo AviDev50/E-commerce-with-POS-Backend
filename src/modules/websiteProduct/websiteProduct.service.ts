@@ -1,5 +1,19 @@
 import prisma from "../../config/db.js"; // ⚠️ apna actual prisma import path daalo
 import { Prisma } from "@prisma/client";
+import { formatImageUrl } from "../../utils/formatImageUrl.js"; // ⚠️ apna actual path daalo
+
+function parseImages(images: any): string[] {
+  if (Array.isArray(images)) return images;
+  if (typeof images === "string") {
+    try {
+      const parsed = JSON.parse(images);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 // Category + saare descendant category IDs nikalne ke liye (self-referential tree)
 async function getCategoryAndDescendantIds(slug: string): Promise<string[]> {
@@ -112,11 +126,14 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
         ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
         : 0;
 
+    const imgs = parseImages(p.images);
+    const image = imgs.length > 0 ? formatImageUrl(imgs[0]) : null;
+
     return {
       id: p.id,
       name: p.name,
       slug: p.slug,
-      image: p.images?.[0] || null,
+      image,
       displayPrice,
       hasVariants,
       inStock,
@@ -229,44 +246,48 @@ export async function getWebsiteProductBySlugService(slug: string) {
       })
     : [];
 
-  const relatedProducts = relatedRaw.map((p) => ({
+const relatedProducts = relatedRaw.map((p) => {
+  const imgs = parseImages(p.images);
+  return {
     id: p.id,
     name: p.name,
     slug: p.slug,
-    image: p.images?.[0] || null,
+    image: imgs.length > 0 ? formatImageUrl(imgs[0]) : null,
     displayPrice:
       p.variants.length > 0 ? Math.min(...p.variants.map((v) => Number(v.price))) : Number(p.price),
-  }));
-
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    images: product.images,
-    category: product.category,
-    hasVariants,
-    price: hasVariants ? null : Number(product.price),
-    stock: hasVariants ? null : product.stock,
-    displayPrice,
-    taxRate: product.taxRate
-      ? Number(product.taxRate)
-      : product.category?.taxRate
-      ? Number(product.category.taxRate)
-      : null,
-    variants,
-    attributeOptions,
-    avgRating,
-    reviewCount,
-    reviews: product.reviews.map((r) => ({
-      rating: r.rating,
-      comment: r.comment,
-      images: r.images,
-      customerName: r.customer.name,
-      createdAt: r.createdAt,
-    })),
-    relatedProducts,
   };
+});
+  const productImages = parseImages(product.images).map(formatImageUrl);
+
+return {
+  id: product.id,
+  name: product.name,
+  slug: product.slug,
+  description: product.description,
+  images: productImages,
+  category: product.category,
+  hasVariants,
+  price: hasVariants ? null : Number(product.price),
+  stock: hasVariants ? null : product.stock,
+  displayPrice,
+  taxRate: product.taxRate
+    ? Number(product.taxRate)
+    : product.category?.taxRate
+    ? Number(product.category.taxRate)
+    : null,
+  variants,
+  attributeOptions,
+  avgRating,
+  reviewCount,
+  reviews: product.reviews.map((r) => ({
+    rating: r.rating,
+    comment: r.comment,
+    images: parseImages(r.images).map(formatImageUrl),
+    customerName: r.customer.name,
+    createdAt: r.createdAt,
+  })),
+  relatedProducts,
+};
   // Note: costPrice kabhi bhi is response mein nahi hai — business-sensitive field, customer ko kabhi expose nahi karna
 }
 
