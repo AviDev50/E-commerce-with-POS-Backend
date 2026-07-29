@@ -189,6 +189,10 @@ export async function getProductByIdService(id: string) {
       ...v,
       images: formatImageUrls(JSON.parse(v.images || "[]")),
     })),
+    reviews: product.reviews.map((r) => ({
+      ...r,
+      images: formatImageUrls(JSON.parse(r.images || "[]")),
+    })),
   };
 }
 
