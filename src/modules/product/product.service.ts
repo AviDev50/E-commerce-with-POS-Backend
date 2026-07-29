@@ -170,15 +170,27 @@ export async function getProductByIdService(id: string) {
           },
         },
       },
-      reviews: true,
+      reviews: {
+        include: { customer: { select: { id: true, name: true } } },
+      },
     },
   });
 
-if (!product) {
-  throw new Error("Product not found");
-}
+  if (!product) {
+    throw new Error("Product not found");
+  }
 
-return withFullImageUrls(product);
+  return {
+    ...withFullImageUrls(product),
+    variants: product.variants.map((v) => ({
+      ...v,
+      images: formatImageUrls(JSON.parse(v.images || "[]")),
+    })),
+    reviews: product.reviews.map((r) => ({
+      ...r,
+      images: formatImageUrls(JSON.parse(r.images || "[]")),
+    })),
+  };
 }
 
 export async function updateProductService(id: string, data: UpdateProductInput) {
