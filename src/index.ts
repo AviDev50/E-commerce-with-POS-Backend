@@ -18,6 +18,7 @@ import permissionRoutes from "./modules/permission/permission.routes.js";
 import couponRoutes from "./modules/coupon/coupon.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
 import customerRoutes from "./modules/customer/customer.routes.js";
+import cartRoutes from "./modules/carts/cart.routes.js"
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -55,6 +56,7 @@ app.use("/api/permissions", permissionRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/customer", customerRoutes);
+app.use("/api/website/cart", cartRoutes);
 
 // Start Server
 app.listen(PORT, () => {
