@@ -16,8 +16,13 @@ export async function getPermissionsByRoleService(role: Role) {
   return rolePermissions.map((rp) => rp.permission);
 }
 
-export async function assignPermissionService(role: Role, permissionKey: string) {
-  const permission = await prisma.permission.findUnique({ where: { key: permissionKey } });
+export async function assignPermissionService(
+  role: Role,
+  permissionKey: string,
+) {
+  const permission = await prisma.permission.findUnique({
+    where: { key: permissionKey },
+  });
 
   if (!permission) {
     throw new Error("Permission not found");
@@ -36,8 +41,13 @@ export async function assignPermissionService(role: Role, permissionKey: string)
   });
 }
 
-export async function revokePermissionService(role: Role, permissionKey: string) {
-  const permission = await prisma.permission.findUnique({ where: { key: permissionKey } });
+export async function revokePermissionService(
+  role: Role,
+  permissionKey: string,
+) {
+  const permission = await prisma.permission.findUnique({
+    where: { key: permissionKey },
+  });
 
   if (!permission) {
     throw new Error("Permission not found");

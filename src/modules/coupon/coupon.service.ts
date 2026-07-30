@@ -1,5 +1,6 @@
 import prisma from "../../config/db.js";
 import { DiscountType } from "@prisma/client";
+import { computeCouponDiscount } from "../../utils/couponValidator.js";
 
 interface CreateCouponInput {
   code: string;
@@ -17,6 +18,26 @@ interface UpdateCouponInput {
   maxUses?: number;
   expiresAt?: string;
   isActive?: boolean;
+}
+
+export async function validateCouponService(code: string, subtotal: number) {
+  const coupon = await prisma.coupon.findUnique({
+    where: { code: code.toUpperCase().trim() },
+  });
+
+  if (!coupon) {
+    throw new Error("Invalid coupon code");
+  }
+
+  const discount = computeCouponDiscount(coupon, subtotal);
+
+  return {
+    valid: true,
+    code: coupon.code,
+    discountType: coupon.discountType,
+    discount,
+    finalAmount: subtotal - discount,
+  };
 }
 
 export async function createCouponService(data: CreateCouponInput) {

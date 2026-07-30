@@ -2,6 +2,7 @@ import prisma from "../../config/db.js";
 import { Prisma, PaymentMethod, GstType } from "@prisma/client";
 import { calculateTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
+import { computeCouponDiscount } from "../../utils/couponValidator.js";
 
 interface OrderItemInput {
   productId: string;
@@ -37,7 +38,7 @@ interface ResolvedItem {
 
 async function resolveOrderItems(
   tx: Prisma.TransactionClient,
-  items: OrderItemInput[]
+  items: OrderItemInput[],
 ): Promise<ResolvedItem[]> {
   const resolved: ResolvedItem[] = [];
 
@@ -58,7 +59,9 @@ async function resolveOrderItems(
     let price: number;
 
     if (item.variantId) {
-      const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+      const variant = await tx.productVariant.findUnique({
+        where: { id: item.variantId },
+      });
       if (!variant || variant.productId !== item.productId) {
         throw new Error(`Variant not found for product: ${product.name}`);
       }
@@ -70,8 +73,8 @@ async function resolveOrderItems(
     const taxRatePercent = product.taxRate
       ? Number(product.taxRate)
       : product.category?.taxRate
-      ? Number(product.category.taxRate)
-      : 0;
+        ? Number(product.category.taxRate)
+        : 0;
 
     resolved.push({
       productId: item.productId,
@@ -87,7 +90,10 @@ async function resolveOrderItems(
 }
 
 // Atomic check-and-decrement — race condition safe (Postgres row-lock via UPDATE)
-async function deductStock(tx: Prisma.TransactionClient, items: ResolvedItem[]) {
+async function deductStock(
+  tx: Prisma.TransactionClient,
+  items: ResolvedItem[],
+) {
   for (const item of items) {
     if (item.variantId) {
       const result = await tx.productVariant.updateMany({
@@ -111,7 +117,11 @@ async function deductStock(tx: Prisma.TransactionClient, items: ResolvedItem[]) 
 
 async function restoreStock(
   tx: Prisma.TransactionClient,
-  orderItems: { productId: string; variantId: string | null; quantity: number }[]
+  orderItems: {
+    productId: string;
+    variantId: string | null;
+    quantity: number;
+  }[],
 ) {
   for (const item of orderItems) {
     if (item.variantId) {
@@ -128,29 +138,25 @@ async function restoreStock(
   }
 }
 
-async function applyCoupon(tx: Prisma.TransactionClient, couponCode: string, subtotal: number) {
-  const coupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+async function applyCoupon(
+  tx: Prisma.TransactionClient,
+  couponCode: string,
+  subtotal: number,
+) {
+  const coupon = await tx.coupon.findUnique({
+    where: { code: couponCode.toUpperCase().trim() },
+  });
 
-  if (!coupon || !coupon.isActive) {
-    throw new Error("Invalid or inactive coupon code");
-  }
-  if (coupon.expiresAt && coupon.expiresAt < new Date()) {
-    throw new Error("Coupon has expired");
-  }
-  if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
-    throw new Error("Coupon usage limit reached");
-  }
-  if (coupon.minOrderValue && subtotal < Number(coupon.minOrderValue)) {
-    throw new Error(`Minimum order value for this coupon is ${coupon.minOrderValue}`);
+  if (!coupon) {
+    throw new Error("Invalid coupon code");
   }
 
-  let discount = coupon.discountType === "PERCENTAGE"
-    ? (subtotal * Number(coupon.value)) / 100
-    : Number(coupon.value);
+  const discount = computeCouponDiscount(coupon, subtotal);
 
-  discount = Math.min(discount, subtotal);
-
-  await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+  await tx.coupon.update({
+    where: { id: coupon.id },
+    data: { usedCount: { increment: 1 } },
+  });
 
   return { couponId: coupon.id, discount };
 }
@@ -158,7 +164,11 @@ async function applyCoupon(tx: Prisma.TransactionClient, couponCode: string, sub
 function buildItemsWithTax(items: ResolvedItem[], gstType: GstType) {
   return items.map((item) => {
     const itemSubtotal = item.price * item.quantity;
-    const breakdown = calculateTaxBreakdown(itemSubtotal, item.taxRatePercent, gstType);
+    const breakdown = calculateTaxBreakdown(
+      itemSubtotal,
+      item.taxRatePercent,
+      gstType,
+    );
 
     return {
       productId: item.productId,
@@ -182,7 +192,10 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
     const resolvedItems = await resolveOrderItems(tx, data.items);
     await deductStock(tx, resolvedItems);
 
-    const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const subtotal = resolvedItems.reduce(
+      (sum, i) => sum + i.price * i.quantity,
+      0,
+    );
 
     let discount = 0;
     let couponId: string | undefined;
@@ -214,7 +227,9 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         discount,
         total,
         orderItems: { create: itemsWithTax },
-        payment: { create: { method: data.paymentMethod, status: "PAID", amount: total } },
+        payment: {
+          create: { method: data.paymentMethod, status: "PAID", amount: total },
+        },
       },
       include: { orderItems: true, payment: true },
     });
@@ -225,7 +240,9 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
 
 export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
   return prisma.$transaction(async (tx) => {
-    const address = await tx.address.findUnique({ where: { id: data.addressId } });
+    const address = await tx.address.findUnique({
+      where: { id: data.addressId },
+    });
     if (!address || address.customerId !== data.customerId) {
       throw new Error("Address not found");
     }
@@ -241,7 +258,10 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
     const resolvedItems = await resolveOrderItems(tx, data.items);
     await deductStock(tx, resolvedItems);
 
-    const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const subtotal = resolvedItems.reduce(
+      (sum, i) => sum + i.price * i.quantity,
+      0,
+    );
 
     let discount = 0;
     let couponId: string | undefined;
@@ -271,7 +291,9 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
         discount,
         total,
         orderItems: { create: itemsWithTax },
-        payment: { create: { method: "COD", status: "PENDING", amount: total } },
+        payment: {
+          create: { method: "COD", status: "PENDING", amount: total },
+        },
       },
       include: { orderItems: true, payment: true },
     });
@@ -319,7 +341,12 @@ export async function updateOrderStatusService(id: string, status: string) {
   });
 }
 
-export async function refundOrderService(id: string, amount: number, reason: string, processedById: string) {
+export async function refundOrderService(
+  id: string,
+  amount: number,
+  reason: string,
+  processedById: string,
+) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id },
@@ -338,7 +365,10 @@ export async function refundOrderService(id: string, amount: number, reason: str
     await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
 
     if (order.payment) {
-      await tx.payment.update({ where: { id: order.payment.id }, data: { status: "REFUNDED" } });
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { status: "REFUNDED" },
+      });
     }
 
     return tx.refund.create({

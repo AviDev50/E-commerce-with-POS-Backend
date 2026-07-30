@@ -8,7 +8,12 @@ import { checkPermission } from "../../middlewares/permission.middleware.js";
 const router = Router();
 
 // POS — staff only
-router.post("/pos", verifyToken, checkPermission("order:create:pos"), orderController.createPosOrder);
+router.post(
+  "/pos",
+  verifyToken,
+  checkPermission("order:create:pos"),
+  orderController.createPosOrder,
+);
 
 // Online — customer only
 router.post("/online", verifyCustomerToken, orderController.createOnlineOrder);
@@ -18,7 +23,17 @@ router.get("/", verifyAnyToken, orderController.getAllOrders);
 router.get("/:id", verifyAnyToken, orderController.getOrderById);
 
 // Staff only — status update & refund
-router.patch("/:id/status", verifyToken, checkPermission("order:update"), orderController.updateOrderStatus);
-router.post("/:id/refund", verifyToken, checkPermission("order:refund"), orderController.refundOrder);
+router.patch(
+  "/:id/status",
+  verifyToken,
+  checkPermission("order:update"),
+  orderController.updateOrderStatus,
+);
+router.post(
+  "/:id/refund",
+  verifyToken,
+  checkPermission("order:refund"),
+  orderController.refundOrder,
+);
 
 export default router;
