@@ -1,4 +1,5 @@
 import prisma from "../../config/db.js";
+import { formatImageUrl } from "../../utils/formatImageUrl.js";
 
 interface AddToCartInput {
   productId: string;
@@ -43,28 +44,31 @@ async function buildCartResponse(cartId: string) {
 
   let subtotal = 0;
 
-  const mappedItems = items.map((item) => {
-    const unitPrice = item.variant ? Number(item.variant.price) : Number(item.product.price);
-    const availableStock = item.variant ? item.variant.stock : item.product.stock;
-    const lineTotal = unitPrice * item.quantity;
-    subtotal += lineTotal;
+const mappedItems = items.map((item) => {
+  const unitPrice = item.variant ? Number(item.variant.price) : Number(item.product.price);
+  const availableStock = item.variant ? item.variant.stock : item.product.stock;
+  const lineTotal = unitPrice * item.quantity;
+  subtotal += lineTotal;
 
-    return {
-      id: item.id,
-      productId: item.product.id,
-      productName: item.product.name,
-      productSlug: item.product.slug,
-      image: parseImages(item.product.images)[0] || null,
-      variantId: item.variant?.id || null,
-      variantSku: item.variant?.sku || null,
-      quantity: item.quantity,
-      unitPrice,
-      lineTotal,
-      availableStock,
-      isActive: item.product.isActive,
-      inStockEnough: availableStock >= item.quantity,
-    };
-  });
+  const rawImage = parseImages(item.product.images)[0];
+  const image = rawImage ? formatImageUrl(rawImage) : null;
+
+  return {
+    id: item.id,
+    productId: item.product.id,
+    productName: item.product.name,
+    productSlug: item.product.slug,
+    image,
+    variantId: item.variant?.id || null,
+    variantSku: item.variant?.sku || null,
+    quantity: item.quantity,
+    unitPrice,
+    lineTotal,
+    availableStock,
+    isActive: item.product.isActive,
+    inStockEnough: availableStock >= item.quantity,
+  };
+});
 
   return {
     cartId,
