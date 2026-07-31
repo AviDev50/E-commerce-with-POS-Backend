@@ -30,5 +30,6 @@ router.delete(
   couponController.deleteCoupon,
 );
 router.post("/validate", verifyCustomerToken, couponController.validateCoupon); //customer side
+router.get("/active", verifyCustomerToken,couponController.getActiveCoupons);
 
 export default router;
