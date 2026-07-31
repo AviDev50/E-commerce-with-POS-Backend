@@ -106,3 +106,20 @@ export async function deleteCouponService(id: string) {
 
   return prisma.coupon.delete({ where: { id } });
 }
+
+export async function getActiveCouponsService() {
+  return prisma.coupon.findMany({
+    where: {
+      isActive: true,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    select: {
+      code: true,
+      discountType: true,
+      value: true,
+      minOrderValue: true,
+      expiresAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}

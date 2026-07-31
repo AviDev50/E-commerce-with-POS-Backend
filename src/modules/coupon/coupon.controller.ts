@@ -96,3 +96,12 @@ export async function deleteCoupon(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function getActiveCoupons(_req: Request, res: Response) {
+  try {
+    const coupons = await couponService.getActiveCouponsService();
+    return res.status(200).json({ data: coupons });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+}
