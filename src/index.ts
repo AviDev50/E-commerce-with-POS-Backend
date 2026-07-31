@@ -44,19 +44,19 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/attributes", attributeRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/websiteProducts", websiteProductRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/addresses", addressRoutes);
-app.use("/api/settings", settingsRoutes);
-app.use("/api/permissions", permissionRoutes);
-app.use("/api/coupons", couponRoutes);
-app.use("/api/reviews", reviewRoutes);
-app.use("/api/customer", customerRoutes);
-app.use("/api/website/cart", cartRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/attributes", attributeRoutes);
+app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/websiteProducts", websiteProductRoutes);
+app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/addresses", addressRoutes);
+app.use("/api/v1/settings", settingsRoutes);
+app.use("/api/v1/permissions", permissionRoutes);
+app.use("/api/v1/coupons", couponRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/customer", customerRoutes);
+app.use("/api/v1/website/cart", cartRoutes);
 
 // Start Server
 app.listen(PORT, () => {
