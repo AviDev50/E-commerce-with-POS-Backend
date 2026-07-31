@@ -6,6 +6,10 @@ import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.j
 
 const router = Router();
 
+//for customer side
+router.post("/validate", verifyCustomerToken, couponController.validateCoupon);
+router.get("/active", verifyCustomerToken, couponController.getActiveCoupons);
+
 router.use(verifyToken); // login zaroori sabke liye
 
 router.get("/", checkPermission("coupon:read"), couponController.getAllCoupons);
@@ -29,7 +33,5 @@ router.delete(
   checkPermission("coupon:delete"),
   couponController.deleteCoupon,
 );
-router.post("/validate", verifyCustomerToken, couponController.validateCoupon); //customer side
-router.get("/active", verifyCustomerToken,couponController.getActiveCoupons);
 
 export default router;
