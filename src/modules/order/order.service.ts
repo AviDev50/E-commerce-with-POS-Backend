@@ -325,7 +325,7 @@ export async function getAllOrdersService(filters: { customerId?: string }) {
         },
       },
       payment: true,
-      customer: true,
+      customer: { select: { id: true, name: true, phone: true, email: true } },
     },
     orderBy: { createdAt: "desc" },
   });
