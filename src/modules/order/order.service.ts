@@ -24,6 +24,7 @@ interface CreateOnlineOrderInput {
   couponCode?: string;
   customerId: string;
   cartItemIds?: string[];
+  paymentMethod: PaymentMethod;
 }
 
 interface ResolvedItem {
@@ -240,6 +241,9 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
 // ==================== ONLINE ORDER ====================
 
 export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
+  if (data.paymentMethod !== "COD") {
+    throw new Error("Only COD payment is supported at the moment");
+  }
   return prisma.$transaction(async (tx) => {
     const address = await tx.address.findUnique({
       where: { id: data.addressId },
@@ -292,7 +296,7 @@ const order = await tx.order.create({
         discount,
         total,
         orderItems: { create: itemsWithTax },
-        payment: { create: { method: "COD", status: "PENDING", amount: total } },
+        payment: { create: { method: data.paymentMethod, status: "PENDING", amount: total } },
       },
       include: { orderItems: true, payment: true },
     });
