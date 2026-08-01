@@ -53,6 +53,7 @@ export async function createOnlineOrder(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
 export async function getAllOrders(req: Request, res: Response) {
   try {
     // Customer sirf apne orders dekhega, staff sab dekhega
@@ -149,6 +150,23 @@ export async function previewOnlineOrder(req: Request, res: Response) {
     });
 
     return res.status(200).json({ data: preview });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}
+
+
+export async function cancelOrder(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ message: "reason is required" });
+    }
+
+    const result = await orderService.cancelOrderService(id, req.customer!.id, reason);
+    return res.status(200).json({ message: "Order cancelled", data: result });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }
