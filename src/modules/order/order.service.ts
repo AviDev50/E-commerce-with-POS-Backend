@@ -315,11 +315,35 @@ const order = await tx.order.create({
 // ==================== READ / UPDATE / REFUND ====================
 
 export async function getAllOrdersService(filters: { customerId?: string }) {
-  return prisma.order.findMany({
+  const orders = await prisma.order.findMany({
     where: filters.customerId ? { customerId: filters.customerId } : {},
-    include: { orderItems: true, payment: true, customer: true },
+    include: {
+      orderItems: {
+        include: {
+          product: { select: { id: true, name: true, images: true } },
+          variant: { select: { id: true, name: true, images: true } },
+        },
+      },
+      payment: true,
+      customer: true,
+    },
     orderBy: { createdAt: "desc" },
   });
+
+  return orders.map((order) => ({
+    ...order,
+    orderItems: order.orderItems.map((item) => {
+      const rawImages = item.variant?.images || item.product.images;
+      const parsed = JSON.parse(rawImages || "[]");
+
+      return {
+        ...item,
+        productName: item.product.name,
+        variantName: item.variant?.name || null,
+        image: parsed[0] ? formatImageUrl(parsed[0]) : null,
+      };
+    }),
+  }));
 }
 
 export async function getOrderByIdService(id: string) {
