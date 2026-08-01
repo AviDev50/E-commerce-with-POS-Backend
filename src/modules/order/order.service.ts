@@ -484,3 +484,37 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
     couponError: couponError ?? null,
   };
 }
+
+export async function cancelOrderService(id: string, customerId: string, reason: string) {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id },
+      include: { orderItems: true, payment: true },
+    });
+
+    if (!order || order.customerId !== customerId) {
+      throw new Error("Order not found");
+    }
+
+    if (order.status === "CANCELLED" || order.status === "COMPLETED" || order.status === "REFUNDED") {
+      throw new Error(`Order cannot be cancelled — current status is ${order.status}`);
+    }
+
+    await restoreStock(tx, order.orderItems);
+
+    await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
+
+    if (order.payment) {
+      await tx.payment.update({ where: { id: order.payment.id }, data: { status: "FAILED" } });
+    }
+
+    return tx.refund.create({
+      data: {
+        orderId: id,
+        amount: 0,
+        reason,
+        status: "COMPLETED",
+      },
+    });
+  });
+}

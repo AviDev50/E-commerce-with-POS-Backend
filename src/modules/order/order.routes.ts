@@ -7,6 +7,11 @@ import { checkPermission } from "../../middlewares/permission.middleware.js";
 
 const router = Router();
 
+// Online — customer only
+router.post("/online", verifyCustomerToken, orderController.createOnlineOrder);
+router.post("/preview", verifyCustomerToken, orderController.previewOnlineOrder);
+router.post("/:id/cancel", verifyCustomerToken, orderController.cancelOrder);
+
 // POS — staff only
 router.post(
   "/pos",
@@ -14,10 +19,6 @@ router.post(
   checkPermission("order:create:pos"),
   orderController.createPosOrder,
 );
-
-// Online — customer only
-router.post("/online", verifyCustomerToken, orderController.createOnlineOrder);
-router.post("/preview", verifyCustomerToken, orderController.previewOnlineOrder);
 
 // Shared — staff ya customer dono access kar sakte hain (controller ke andar filter/authorize hota hai)
 router.get("/", verifyAnyToken, orderController.getAllOrders);
@@ -36,5 +37,7 @@ router.post(
   checkPermission("order:refund"),
   orderController.refundOrder,
 );
+
+
 
 export default router;
