@@ -18,7 +18,7 @@ import permissionRoutes from "./modules/permission/permission.routes.js";
 import couponRoutes from "./modules/coupon/coupon.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
 import customerRoutes from "./modules/customer/customer.routes.js";
-import cartRoutes from "./modules/carts/cart.routes.js"
+import cartRoutes from "./modules/carts/cart.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);

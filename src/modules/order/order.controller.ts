@@ -33,12 +33,10 @@ export async function createPosOrder(req: Request, res: Response) {
 
 export async function createOnlineOrder(req: Request, res: Response) {
   try {
-    const { items, addressId, couponCode } = req.body;
+    const { items, addressId, couponCode, cartItemIds } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0 || !addressId) {
-      return res
-        .status(400)
-        .json({ message: "items and addressId are required" });
+      return res.status(400).json({ message: "items and addressId are required" });
     }
 
     const order = await orderService.createOnlineOrderService({
@@ -46,6 +44,7 @@ export async function createOnlineOrder(req: Request, res: Response) {
       addressId,
       couponCode,
       customerId: req.customer!.id,
+      cartItemIds,
     });
 
     return res.status(201).json({ message: "Order created", data: order });
