@@ -132,3 +132,24 @@ export async function refundOrder(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function previewOnlineOrder(req: Request, res: Response) {
+  try {
+    const { items, addressId, couponCode } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0 || !addressId) {
+      return res.status(400).json({ message: "items and addressId are required" });
+    }
+
+    const preview = await orderService.previewOnlineOrderService({
+      items,
+      addressId,
+      couponCode,
+      customerId: req.customer!.id,
+    });
+
+    return res.status(200).json({ data: preview });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}

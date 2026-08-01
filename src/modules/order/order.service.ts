@@ -3,6 +3,7 @@ import { Prisma, PaymentMethod, GstType } from "@prisma/client";
 import { calculateTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { computeCouponDiscount } from "../../utils/couponValidator.js";
+import { formatImageUrl } from "../../utils/formatImageUrl.js";
 
 interface OrderItemInput {
   productId: string;
@@ -392,4 +393,94 @@ export async function refundOrderService(
       },
     });
   });
+}
+
+interface PreviewOrderInput {
+  items: OrderItemInput[];
+  addressId: string;
+  couponCode?: string;
+  customerId: string;
+}
+
+export async function previewOnlineOrderService(data: PreviewOrderInput) {
+  const address = await prisma.address.findUnique({ where: { id: data.addressId } });
+  if (!address || address.customerId !== data.customerId) {
+    throw new Error("Address not found");
+  }
+
+  const storeSettings = await prisma.storeSettings.findFirst();
+  const storeState = storeSettings?.state;
+
+  const gstType: GstType =
+    storeState && address.state.toLowerCase() === storeState.toLowerCase()
+      ? "INTRA_STATE"
+      : "INTER_STATE";
+
+  const resolvedItems = await resolveOrderItems(prisma, data.items);
+
+  // Stock availability check — read-only, koi deduction nahi
+  const itemsWithDetails = await Promise.all(
+    resolvedItems.map(async (item) => {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+
+      let availableStock = product?.stock ?? 0;
+      let image: string | null = null;
+
+      if (product?.images) {
+        const parsed = JSON.parse(product.images || "[]");
+        image = parsed[0] ? formatImageUrl(parsed[0]) : null;
+      }
+
+      if (item.variantId) {
+        const variant = await prisma.productVariant.findUnique({ where: { id: item.variantId } });
+        availableStock = variant?.stock ?? 0;
+        if (variant?.images) {
+          const parsedVariant = JSON.parse(variant.images || "[]");
+          if (parsedVariant[0]) image = formatImageUrl(parsedVariant[0]);
+        }
+      }
+
+      return { ...item, availableStock, inStock: availableStock >= item.quantity, image };
+    })
+  );
+
+  const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  let discount = 0;
+  let couponError: string | undefined;
+
+  if (data.couponCode) {
+    try {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: data.couponCode.toUpperCase().trim() },
+      });
+      if (!coupon) throw new Error("Invalid coupon code");
+      discount = computeCouponDiscount(coupon, subtotal);
+    } catch (err: any) {
+      couponError = err.message;
+    }
+  }
+
+  const itemsWithTax = buildItemsWithTax(resolvedItems, gstType);
+  const totalTax = itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0);
+  const total = subtotal - discount + totalTax;
+
+  const summaryItems = itemsWithTax.map((item, idx) => ({
+    ...item,
+    productName: itemsWithDetails[idx].productName,
+    image: itemsWithDetails[idx].image,
+    availableStock: itemsWithDetails[idx].availableStock,
+    inStock: itemsWithDetails[idx].inStock,
+  }));
+
+  return {
+    items: summaryItems,
+    subtotal,
+    discount,
+    tax: totalTax,
+    total,
+    gstType,
+    couponApplied: data.couponCode && !couponError ? data.couponCode.toUpperCase() : null,
+    couponError: couponError ?? null,
+  };
 }

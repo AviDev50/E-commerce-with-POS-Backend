@@ -17,6 +17,7 @@ router.post(
 
 // Online — customer only
 router.post("/online", verifyCustomerToken, orderController.createOnlineOrder);
+router.post("/preview", verifyCustomerToken, orderController.previewOnlineOrder);
 
 // Shared — staff ya customer dono access kar sakte hain (controller ke andar filter/authorize hota hai)
 router.get("/", verifyAnyToken, orderController.getAllOrders);
