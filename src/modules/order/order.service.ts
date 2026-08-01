@@ -23,6 +23,7 @@ interface CreateOnlineOrderInput {
   addressId: string;
   couponCode?: string;
   customerId: string;
+  cartItemIds?: string[];
 }
 
 interface ResolvedItem {
@@ -277,7 +278,7 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
 
     const orderNumber = await generateOrderNumber(tx);
 
-    return tx.order.create({
+const order = await tx.order.create({
       data: {
         orderNumber,
         channel: "ONLINE",
@@ -291,12 +292,18 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
         discount,
         total,
         orderItems: { create: itemsWithTax },
-        payment: {
-          create: { method: "COD", status: "PENDING", amount: total },
-        },
+        payment: { create: { method: "COD", status: "PENDING", amount: total } },
       },
       include: { orderItems: true, payment: true },
     });
+
+    if (data.cartItemIds && data.cartItemIds.length > 0) {
+      await tx.cartItem.deleteMany({
+        where: { id: { in: data.cartItemIds }, cart: { customerId: data.customerId } },
+      });
+    }
+
+    return order;
   });
 }
 
