@@ -33,10 +33,10 @@ export async function createPosOrder(req: Request, res: Response) {
 
 export async function createOnlineOrder(req: Request, res: Response) {
   try {
-    const { items, addressId, couponCode, cartItemIds } = req.body;
+    const { items, addressId, couponCode, cartItemIds, paymentMethod } = req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0 || !addressId) {
-      return res.status(400).json({ message: "items and addressId are required" });
+    if (!items || !Array.isArray(items) || items.length === 0 || !addressId || !paymentMethod) {
+      return res.status(400).json({ message: "items, addressId, and paymentMethod are required" });
     }
 
     const order = await orderService.createOnlineOrderService({
@@ -45,6 +45,7 @@ export async function createOnlineOrder(req: Request, res: Response) {
       couponCode,
       customerId: req.customer!.id,
       cartItemIds,
+      paymentMethod,
     });
 
     return res.status(201).json({ message: "Order created", data: order });
@@ -52,7 +53,6 @@ export async function createOnlineOrder(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
-
 export async function getAllOrders(req: Request, res: Response) {
   try {
     // Customer sirf apne orders dekhega, staff sab dekhega
