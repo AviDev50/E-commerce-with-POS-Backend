@@ -54,3 +54,33 @@ export async function getWebsiteProductFilters(req: Request, res: Response) {
     return res.status(500).json({ message: error.message });
   }
 }
+
+export async function getBestsellers(req: Request, res: Response) {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const products = await websiteProductService.getBestsellersService(limit);
+    return res.status(200).json({ data: products });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+export async function getTrending(req: Request, res: Response) {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const products = await websiteProductService.getTrendingService(limit);
+    return res.status(200).json({ data: products });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
+export async function getTopRated(req: Request, res: Response) {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const products = await websiteProductService.getTopRatedService(limit);
+    return res.status(200).json({ data: products });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+}
