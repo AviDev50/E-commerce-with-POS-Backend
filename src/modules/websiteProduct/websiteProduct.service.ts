@@ -327,3 +327,105 @@ export async function getWebsiteProductFiltersService(categorySlug?: string) {
 
   return filters;
 }
+
+// ==================== Bestsellers / Trending / Top-Rated ====================
+
+async function getTopSellingProductIds(limit: number, sinceDate?: Date) {
+  const grouped = await prisma.orderItem.groupBy({
+    by: ["productId"],
+    where: {
+      order: {
+        status: "COMPLETED", // sirf actually completed orders count honge
+        ...(sinceDate ? { createdAt: { gte: sinceDate } } : {}),
+      },
+    },
+    _sum: { quantity: true },
+    orderBy: { _sum: { quantity: "desc" } },
+    take: limit,
+  });
+
+  return grouped.map((g) => g.productId);
+}
+
+async function getProductCardsByIds(productIds: string[]) {
+  if (productIds.length === 0) return [];
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds }, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      images: true,
+      price: true,
+      stock: true,
+      createdAt: true,
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { select: { price: true, stock: true } },
+      reviews: { where: { isApproved: true }, select: { rating: true } },
+    },
+  });
+
+  const cardMap = new Map(
+    products.map((p) => {
+      const hasVariants = p.variants.length > 0;
+      const displayPrice = hasVariants
+        ? Math.min(...p.variants.map((v) => Number(v.price)))
+        : Number(p.price);
+      const inStock = hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+      const reviewCount = p.reviews.length;
+      const avgRating =
+        reviewCount > 0
+          ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
+          : 0;
+
+      return [
+        p.id,
+        {
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          image: parseImages(p.images)[0] || null,
+          displayPrice,
+          hasVariants,
+          inStock,
+          avgRating,
+          reviewCount,
+          createdAt: p.createdAt,
+          category: p.category,
+        },
+      ] as const;
+    })
+  );
+
+  // productIds ka original rank-order preserve karna hai (bestseller/trending/rating desc order),
+  // kyunki findMany({ where: { id: { in: [...] } } }) apna default order deta hai, IN list ka order nahi
+  return productIds.map((id) => cardMap.get(id)).filter((p) => p !== undefined);
+}
+
+export async function getBestsellersService(limit: number = 10) {
+  const productIds = await getTopSellingProductIds(limit); // all-time, no date filter
+  return getProductCardsByIds(productIds);
+}
+
+export async function getTrendingService(limit: number = 10) {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const productIds = await getTopSellingProductIds(limit, sevenDaysAgo);
+  return getProductCardsByIds(productIds);
+}
+
+export async function getTopRatedService(limit: number = 10, minReviews: number = 3) {
+  const grouped = await prisma.review.groupBy({
+    by: ["productId"],
+    where: { isApproved: true },
+    _avg: { rating: true },
+    _count: { rating: true },
+    having: { rating: { _count: { gte: minReviews } } },
+    orderBy: { _avg: { rating: "desc" } },
+    take: limit,
+  });
+
+  const productIds = grouped.map((g) => g.productId);
+  return getProductCardsByIds(productIds); // rating-desc order already preserved
+}
