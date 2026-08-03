@@ -379,7 +379,6 @@ async function getProductCardsByIds(productIds: string[]) {
           ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
           : 0;
 
-      // ⬇️ FIX: parseImages ke baad formatImageUrl bhi lagana hai (jaisa getAllWebsiteProductsService mein hai)
       const imgs = parseImages(p.images);
       const image = imgs.length > 0 ? formatImageUrl(imgs[0]) : null;
 
