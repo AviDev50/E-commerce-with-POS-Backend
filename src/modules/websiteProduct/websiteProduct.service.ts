@@ -379,13 +379,17 @@ async function getProductCardsByIds(productIds: string[]) {
           ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
           : 0;
 
+      // ⬇️ FIX: parseImages ke baad formatImageUrl bhi lagana hai (jaisa getAllWebsiteProductsService mein hai)
+      const imgs = parseImages(p.images);
+      const image = imgs.length > 0 ? formatImageUrl(imgs[0]) : null;
+
       return [
         p.id,
         {
           id: p.id,
           name: p.name,
           slug: p.slug,
-          image: parseImages(p.images)[0] || null,
+          image, // ⬅️ ab yeh full URL dega
           displayPrice,
           hasVariants,
           inStock,
@@ -398,9 +402,8 @@ async function getProductCardsByIds(productIds: string[]) {
     })
   );
 
-  // productIds ka original rank-order preserve karna hai (bestseller/trending/rating desc order),
-  // kyunki findMany({ where: { id: { in: [...] } } }) apna default order deta hai, IN list ka order nahi
-  return productIds.map((id) => cardMap.get(id)).filter((p) => p !== undefined);
+  const productIds_ordered = productIds.map((id) => cardMap.get(id)).filter((p) => p !== undefined);
+  return productIds_ordered;
 }
 
 export async function getBestsellersService(limit: number = 10) {
