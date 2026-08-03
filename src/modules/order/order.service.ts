@@ -335,11 +335,12 @@ export async function getAllOrdersService(filters: { customerId?: string }) {
     orderItems: order.orderItems.map((item) => {
       const rawImages = item.variant?.images || item.product.images;
       const parsed = JSON.parse(rawImages || "[]");
+      const { product, variant, ...cleanItem } = item;
 
       return {
-        ...item,
-        productName: item.product.name,
-        variantName: item.variant?.name || null,
+        ...cleanItem,
+        productName: product.name,
+        variantName: variant?.name || null,
         image: parsed[0] ? formatImageUrl(parsed[0]) : null,
       };
     }),

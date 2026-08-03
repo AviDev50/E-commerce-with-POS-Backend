@@ -20,6 +20,11 @@ const permissions = [
   { key: "category:update", description: "Edit categories" },
   { key: "category:delete", description: "Delete categories" },
 
+   { key: "banner:create", description: "Create homepage banners" },
+  { key: "banner:read", description: "View banners" },
+  { key: "banner:update", description: "Edit banners" },
+  { key: "banner:delete", description: "Delete banners" },
+
   { key: "order:create:pos", description: "Create POS orders" },
   { key: "order:read", description: "View orders" },
   { key: "order:update", description: "Update order status" },
@@ -51,6 +56,11 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "category:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "category:update": [Role.ADMIN, Role.MANAGER],
   "category:delete": [Role.ADMIN],
+
+  "banner:create": [Role.ADMIN, Role.MANAGER],
+  "banner:read": [Role.ADMIN, Role.MANAGER],
+  "banner:update": [Role.ADMIN, Role.MANAGER],
+  "banner:delete": [Role.ADMIN, Role.MANAGER],
 
   "order:create:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "order:read": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
