@@ -21,6 +21,7 @@ import customerRoutes from "./modules/customer/customer.routes.js";
 import cartRoutes from "./modules/carts/cart.routes.js";
 import bannerRoutes from "./modules/banner/banner.routes.js";
 import websiteBannerRoutes from "./modules/websiteBanner/websiteBanner.routes.js";
+import wishlistRoutes from "./modules/wishlist/wishlist.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -62,6 +63,7 @@ app.use("/api/v1/website/cart", cartRoutes);
 app.use("/api/v1/banners", bannerRoutes);              
 app.use("/api/v1/website/banners", websiteBannerRoutes);
 app.use("/api/v1/websiteProducts", websiteProductRoutes);
+app.use("/api/website/wishlist", wishlistRoutes);
 
 // Start Server
 app.listen(PORT, () => {
