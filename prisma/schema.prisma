@@ -57,9 +57,10 @@ enum RefundStatus {
   COMPLETED
 }
 
-enum GstType {
-  INTRA_STATE
-  INTER_STATE
+enum TaxApplyWhen {
+  DESTINATION
+  ORIGIN_MATCH
+  ORIGIN_MISMATCH
 }
 
 model User {
@@ -126,7 +127,8 @@ model Category {
   parentId String?
   parent   Category?  @relation("CategoryToSubcategory", fields: [parentId], references: [id])
   children Category[] @relation("CategoryToSubcategory")
-  taxRate  Decimal?   @db.Decimal(5, 2)   // e.g. 18.00 (%)
+   taxClassId String?
+    taxClass   TaxClass? @relation(fields: [taxClassId], references: [id])
 
   products Product[]
 
@@ -141,7 +143,8 @@ model Product {
   sku               String    @unique
   price             Decimal   @db.Decimal(10, 2)
   costPrice         Decimal?  @db.Decimal(10, 2)
-  taxRate           Decimal?  @db.Decimal(5, 2)   // null = category ka rate use hoga
+  taxClassId        String?
+  taxClass          TaxClass? @relation(fields: [taxClassId], references: [id])
   images            String?
   isActive          Boolean   @default(true)
   stock             Int       @default(0)
@@ -217,7 +220,6 @@ model Order {
   orderNumber String       @unique
   channel     OrderChannel @default(ONLINE)
   status      OrderStatus  @default(PENDING)
-  gstType     GstType?
 
   customerId  String?
   customer    Customer?    @relation(fields: [customerId], references: [id])
@@ -253,11 +255,8 @@ model OrderItem {
   variant     ProductVariant? @relation(fields: [variantId], references: [id])
   quantity    Int
   price       Decimal         @db.Decimal(10, 2)
-  taxRate     Decimal         @default(0) @db.Decimal(5, 2)
   taxAmount   Decimal         @default(0) @db.Decimal(10, 2)
-  cgstAmount  Decimal         @default(0) @db.Decimal(10, 2)
-  sgstAmount  Decimal         @default(0) @db.Decimal(10, 2)
-  igstAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  taxBreakdown Json?
   subtotal    Decimal         @db.Decimal(10, 2)
 
   @@map("order_items")
@@ -299,6 +298,7 @@ model StoreSettings {
   phone        String?
   address      String?
   state        String?
+   country      String?
   currency     String   @default("INR")
   taxPercent   Decimal  @default(0) @db.Decimal(5, 2)
   updatedAt    DateTime @updatedAt
@@ -427,4 +427,32 @@ model WishlistItem {
 
   @@unique([customerId, productId, variantId])
   @@map("wishlist_items")
+}
+
+model TaxClass {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+
+  rates     TaxRate[]
+  products  Product[]
+  categories Category[]
+
+  @@map("tax_classes")
+}
+
+model TaxRate {
+  id          String       @id @default(uuid())
+  taxClassId  String
+  taxClass    TaxClass     @relation(fields: [taxClassId], references: [id])
+  country     String
+  state       String?
+  name        String
+  rate        Decimal      @db.Decimal(5, 2)
+  appliesWhen TaxApplyWhen @default(DESTINATION)
+  isCompound  Boolean      @default(false)
+  priority    Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  @@map("tax_rates")
 }

@@ -5,7 +5,7 @@ interface CreateCategoryInput {
   name: string;
   slug?: string;
   parentId?: string;
-  taxRate?: number;
+ taxClassId?: string;
   image?: string;
 }
 
@@ -13,7 +13,7 @@ interface UpdateCategoryInput {
   name?: string;
   slug?: string;
   parentId?: string;
-  taxRate?: number;
+ taxClassId?: string;
   image?: string;
 }
 
@@ -45,7 +45,7 @@ export async function createCategoryService(data: CreateCategoryInput) {
       name: data.name,
       slug,
       parentId: data.parentId,
-      taxRate: data.taxRate,
+      taxClassId: data.taxClassId,
       image: data.image,
     },
   });

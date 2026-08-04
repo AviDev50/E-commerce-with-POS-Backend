@@ -3,7 +3,7 @@ import * as categoryService from "./category.service.js";
 
 export async function createCategory(req: Request, res: Response) {
   try {
-    const { name, slug, parentId, taxRate } = req.body;
+    const { name, slug, parentId, taxClassId } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "name is required" });
@@ -16,7 +16,7 @@ export async function createCategory(req: Request, res: Response) {
       name,
       slug,
       parentId,
-      taxRate: taxRate ? Number(taxRate) : undefined,
+    taxClassId,
       image,
     });
 
@@ -49,7 +49,7 @@ export async function getCategoryById(req: Request, res: Response) {
 export async function updateCategory(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const { name, slug, parentId, taxRate } = req.body;
+    const { name, slug, parentId, taxClassId } = req.body;
 
     const file = req.file as Express.Multer.File | undefined;
     const image = file ? `/uploads/${file.filename}` : undefined;
@@ -58,7 +58,7 @@ export async function updateCategory(req: Request, res: Response) {
       name,
       slug,
       parentId,
-      taxRate: taxRate ? Number(taxRate) : undefined,
+     taxClassId,
       image,
     });
 

@@ -1,23 +1,52 @@
-import { GstType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
-interface TaxBreakdown {
-  taxAmount: number;
-  cgstAmount: number;
-  sgstAmount: number;
-  igstAmount: number;
+interface TaxBreakdownItem {
+  name: string;
+  rate: number;
+  amount: number;
 }
 
-export function calculateTaxBreakdown(
-  taxableAmount: number,
-  taxRatePercent: number,
-  gstType: GstType
-): TaxBreakdown {
-  const taxAmount = (taxableAmount * taxRatePercent) / 100;
-
-  if (gstType === "INTRA_STATE") {
-    const half = taxAmount / 2;
-    return { taxAmount, cgstAmount: half, sgstAmount: half, igstAmount: 0 };
+export async function resolveTaxBreakdown(
+  tx: Prisma.TransactionClient,
+  taxClassId: string | null,
+  destCountry: string,
+  destState: string,
+  originCountry: string | null,
+  originState: string | null,
+  taxableAmount: number
+): Promise<{ taxAmount: number; breakdown: TaxBreakdownItem[] }> {
+  if (!taxClassId) {
+    return { taxAmount: 0, breakdown: [] };
   }
 
-  return { taxAmount, cgstAmount: 0, sgstAmount: 0, igstAmount: taxAmount };
+  const rates = await tx.taxRate.findMany({
+    where: {
+      taxClassId,
+      country: destCountry,
+      OR: [{ state: destState }, { state: null }],
+    },
+    orderBy: { priority: "asc" },
+  });
+
+  const isOriginSameAsDest =
+    !!originCountry && !!originState && originCountry === destCountry && originState === destState;
+
+  let runningAmount = taxableAmount;
+  let totalTax = 0;
+  const breakdown: TaxBreakdownItem[] = [];
+
+  for (const r of rates) {
+    if (r.appliesWhen === "ORIGIN_MATCH" && !isOriginSameAsDest) continue;
+    if (r.appliesWhen === "ORIGIN_MISMATCH" && isOriginSameAsDest) continue;
+
+    const base = r.isCompound ? runningAmount : taxableAmount;
+    const amount = (base * Number(r.rate)) / 100;
+
+    breakdown.push({ name: r.name, rate: Number(r.rate), amount });
+    totalTax += amount;
+
+    if (r.isCompound) runningAmount += amount;
+  }
+
+  return { taxAmount: totalTax, breakdown };
 }

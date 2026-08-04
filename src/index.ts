@@ -22,6 +22,7 @@ import cartRoutes from "./modules/carts/cart.routes.js";
 import bannerRoutes from "./modules/banner/banner.routes.js";
 import websiteBannerRoutes from "./modules/websiteBanner/websiteBanner.routes.js";
 import wishlistRoutes from "./modules/wishlist/wishlist.routes.js";
+import taxRoutes from "./modules/tax/tax.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -50,7 +51,6 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/attributes", attributeRoutes);
 app.use("/api/v1/products", productRoutes);
-
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/addresses", addressRoutes);
@@ -63,7 +63,8 @@ app.use("/api/v1/website/cart", cartRoutes);
 app.use("/api/v1/banners", bannerRoutes);              
 app.use("/api/v1/website/banners", websiteBannerRoutes);
 app.use("/api/v1/websiteProducts", websiteProductRoutes);
-app.use("/api/website/wishlist", wishlistRoutes);
+app.use("/api/v1/website/wishlist", wishlistRoutes);
+app.use("/api/tax", taxRoutes);
 
 // Start Server
 app.listen(PORT, () => {
