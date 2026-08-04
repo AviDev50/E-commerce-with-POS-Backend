@@ -9,7 +9,7 @@ interface CreateProductInput {
   sku: string;
   price: number;
   costPrice?: number;
-  taxRate?: number;
+ taxClassId?: string;
   categoryId?: string;
   stock?: number;
   lowStockThreshold?: number;
@@ -23,7 +23,7 @@ interface UpdateProductInput {
   sku?: string;
   price?: number;
   costPrice?: number;
-  taxRate?: number;
+ taxClassId?: string;
   categoryId?: string;
   stock?: number;
   lowStockThreshold?: number;
@@ -111,7 +111,7 @@ const product = await prisma.product.create({
     sku: data.sku,
     price: data.price,
     costPrice: data.costPrice,
-    taxRate: data.taxRate,
+  taxClassId: data.taxClassId,
     categoryId: data.categoryId,
     stock: data.stock ?? 0,
     lowStockThreshold: data.lowStockThreshold ?? 5,

@@ -120,6 +120,7 @@ async function main() {
   }
 
     await seedBootstrapAdmin();
+    await seedIndiaTax();
 
 
   console.log("✅ Permissions seeded successfully");
@@ -133,3 +134,47 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+  async function seedIndiaTax() {
+  const existing = await prisma.taxClass.findUnique({ where: { name: "Standard" } });
+  if (existing) {
+    console.log("ℹ️  Tax data already seeded, skipping");
+    return;
+  }
+
+  const standardClass = await prisma.taxClass.create({ data: { name: "Standard" } });
+
+  await prisma.taxRate.createMany({
+    data: [
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: "Karnataka", // apna StoreSettings.state jo bhi hai
+        name: "CGST",
+        rate: 9,
+        appliesWhen: "ORIGIN_MATCH",
+        priority: 1,
+      },
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: "Karnataka",
+        name: "SGST",
+        rate: 9,
+        appliesWhen: "ORIGIN_MATCH",
+        priority: 2,
+      },
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: null,
+        name: "IGST",
+        rate: 18,
+        appliesWhen: "ORIGIN_MISMATCH",
+        priority: 1,
+      },
+    ],
+  });
+
+  console.log("✅ Default India tax data seeded (Standard class — 18% GST)");
+}

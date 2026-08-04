@@ -5,7 +5,7 @@ import * as productService from "./product.service.js";
 
 export async function createProduct(req: Request, res: Response) {
   try {
-    const { name, slug, description, sku, price, costPrice, taxRate, categoryId, stock, lowStockThreshold } = req.body;
+    const { name, slug, description, sku, price, costPrice, taxClassId, categoryId, stock, lowStockThreshold } = req.body;
 
     if (!name || !sku || !price) {
       return res.status(400).json({ message: "name, sku, and price are required" });
@@ -21,7 +21,7 @@ export async function createProduct(req: Request, res: Response) {
       sku,
       price: Number(price),
       costPrice: costPrice ? Number(costPrice) : undefined,
-      taxRate: taxRate ? Number(taxRate) : undefined,
+     taxClassId,
       categoryId,
       stock: stock ? Number(stock) : undefined,
       lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
@@ -70,7 +70,7 @@ export async function getProductById(req: Request, res: Response) {
 export async function updateProduct(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const { name, slug, description, sku, price, costPrice, taxRate, categoryId, stock, lowStockThreshold, isActive } = req.body;
+    const { name, slug, description, sku, price, costPrice, taxClassId, categoryId, stock, lowStockThreshold, isActive } = req.body;
 
     const files = (req.files as Express.Multer.File[]) || [];
     const images = files.length > 0 ? files.map((file) => `/uploads/${file.filename}`) : undefined;
@@ -82,7 +82,7 @@ export async function updateProduct(req: Request, res: Response) {
       sku,
       price: price ? Number(price) : undefined,
       costPrice: costPrice ? Number(costPrice) : undefined,
-      taxRate: taxRate ? Number(taxRate) : undefined,
+     taxClassId,
       categoryId,
       stock: stock ? Number(stock) : undefined,
       lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
