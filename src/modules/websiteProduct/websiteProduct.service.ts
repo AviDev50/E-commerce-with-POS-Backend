@@ -1,6 +1,7 @@
 import prisma from "../../config/db.js"; // ⚠️ apna actual prisma import path daalo
 import { Prisma } from "@prisma/client";
 import { formatImageUrl } from "../../utils/formatImageUrl.js"; // ⚠️ apna actual path daalo
+import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 //import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
 
 function parseImages(images: any): string[] {
@@ -178,7 +179,7 @@ export async function getWebsiteProductBySlugService(slug: string) {
   const product = await prisma.product.findUnique({
     where: { slug },
     include: {
-      category: { select: { id: true, name: true, slug: true, taxRate: true } },
+      category: { select: { id: true, name: true, slug: true, taxClassId: true } },
       variants: {
         include: {
           attributeValues: {
@@ -259,6 +260,21 @@ const relatedProducts = relatedRaw.map((p) => {
   };
 });
   const productImages = parseImages(product.images).map(formatImageUrl);
+  const storeSettings = await prisma.storeSettings.findFirst();
+const storeCountry = storeSettings?.country ?? "India";
+const storeState = storeSettings?.state ?? "";
+
+const taxClassId = product.taxClassId ?? product.category?.taxClassId ?? null;
+
+const { taxAmount: estimatedTaxPercent } = await resolveTaxBreakdown(
+  prisma as unknown as Prisma.TransactionClient,
+  taxClassId,
+  storeCountry,
+  storeState,
+  storeCountry,
+  storeState,
+  100
+);
 
 return {
   id: product.id,
@@ -271,11 +287,7 @@ return {
   price: hasVariants ? null : Number(product.price),
   stock: hasVariants ? null : product.stock,
   displayPrice,
-  taxRate: product.taxRate
-    ? Number(product.taxRate)
-    : product.category?.taxRate
-    ? Number(product.category.taxRate)
-    : null,
+ taxRate: estimatedTaxPercent > 0 ? estimatedTaxPercent : null,
   variants,
   attributeOptions,
   avgRating,
