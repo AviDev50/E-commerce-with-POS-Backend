@@ -254,17 +254,17 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         tax: totalTax,
         discount,
         total,
-        orderItems: {
-          create: itemsWithTax.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId,
-            quantity: i.quantity,
-            price: i.price,
-            subtotal: i.subtotal,
-            taxAmount: i.taxAmount,
-            taxBreakdown: i.taxBreakdown,
-          })),
-        },
+    orderItems: {
+  create: itemsWithTax.map((i) => ({
+    productId: i.productId,
+    variantId: i.variantId,
+    quantity: i.quantity,
+    price: i.price,
+    subtotal: i.subtotal,
+    taxAmount: i.taxAmount,
+ taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+  })),
+},
         payment: {
           create: { method: data.paymentMethod, status: "PAID", amount: total },
         },
@@ -335,17 +335,17 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
         tax: totalTax,
         discount,
         total,
-        orderItems: {
-          create: itemsWithTax.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId,
-            quantity: i.quantity,
-            price: i.price,
-            subtotal: i.subtotal,
-            taxAmount: i.taxAmount,
-            taxBreakdown: i.taxBreakdown,
-          })),
-        },
+     orderItems: {
+  create: itemsWithTax.map((i) => ({
+    productId: i.productId,
+    variantId: i.variantId,
+    quantity: i.quantity,
+    price: i.price,
+    subtotal: i.subtotal,
+    taxAmount: i.taxAmount,
+   taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+  })),
+},
         payment: { create: { method: "COD", status: "PENDING", amount: total } },
       },
       include: { orderItems: true, payment: true },
