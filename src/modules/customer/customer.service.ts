@@ -2,12 +2,15 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../../config/db.js";
 import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken.js";
+import {Gender} from "@prisma/client"
 
 interface RegisterInput {
   name: string;
   phone: string;
   email?: string;
   password: string;
+  dob: string;
+  gender: Gender;
 }
 
 interface LoginInput {
@@ -26,7 +29,15 @@ function generateAccessToken(id: string): string {
 export async function registerCustomerService(data: RegisterInput) {
   const existing = await prisma.customer.findUnique({ where: { phone: data.phone } });
   if (existing) {
-    throw new Error("Customer with this phone number already exists");
+    const err: any = new Error("Customer with this phone number already exists");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  if (!["MALE", "FEMALE", "OTHER"].includes(data.gender)) {
+    const err: any = new Error("Invalid gender value");
+    err.statusCode = 400;
+    throw err;
   }
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -37,10 +48,12 @@ export async function registerCustomerService(data: RegisterInput) {
       phone: data.phone,
       email: data.email,
       password: hashedPassword,
+      dob: new Date(data.dob),
+      gender: data.gender,
     },
   });
 
-  const { password, ...customerWithoutPassword } = customer;
+  const { password: _password, ...customerWithoutPassword } = customer;
   return customerWithoutPassword;
 }
 
