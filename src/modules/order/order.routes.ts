@@ -31,6 +31,7 @@ router.patch(
   checkPermission("order:update"),
   orderController.updateOrderStatus,
 );
+
 router.post(
   "/:id/refund",
   verifyToken,

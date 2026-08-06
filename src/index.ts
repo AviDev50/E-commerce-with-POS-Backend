@@ -64,7 +64,7 @@ app.use("/api/v1/banners", bannerRoutes);
 app.use("/api/v1/website/banners", websiteBannerRoutes);
 app.use("/api/v1/websiteProducts", websiteProductRoutes);
 app.use("/api/v1/website/wishlist", wishlistRoutes);
-app.use("/api/tax", taxRoutes);
+app.use("/api/v1/tax", taxRoutes);
 
 // Start Server
 app.listen(PORT, () => {

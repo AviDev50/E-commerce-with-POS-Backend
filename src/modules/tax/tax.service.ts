@@ -16,6 +16,21 @@ interface CreateTaxRateInput {
   priority?: number;
 }
 
+interface UpdateTaxClassInput {
+  name?: string;
+}
+
+interface UpdateTaxRateInput {
+  country?: string;
+  state?: string;
+  name?: string;
+  rate?: number;
+  appliesWhen?: TaxApplyWhen;
+  isCompound?: boolean;
+  priority?: number;
+}
+
+
 export async function createTaxClassService(data: CreateTaxClassInput) {
   const existing = await prisma.taxClass.findUnique({ where: { name: data.name } });
   if (existing) {
@@ -83,4 +98,29 @@ export async function deleteTaxRateService(id: string) {
   }
 
   return prisma.taxRate.delete({ where: { id } });
+}
+
+export async function updateTaxClassService(id: string, data: UpdateTaxClassInput) {
+  const existing = await prisma.taxClass.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error("Tax class not found");
+  }
+
+  if (data.name) {
+    const nameTaken = await prisma.taxClass.findFirst({ where: { name: data.name, NOT: { id } } });
+    if (nameTaken) {
+      throw new Error("A tax class with this name already exists");
+    }
+  }
+
+  return prisma.taxClass.update({ where: { id }, data });
+}
+
+export async function updateTaxRateService(id: string, data: UpdateTaxRateInput) {
+  const existing = await prisma.taxRate.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error("Tax rate not found");
+  }
+
+  return prisma.taxRate.update({ where: { id }, data });
 }

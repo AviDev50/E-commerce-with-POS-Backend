@@ -149,7 +149,7 @@ main()
       {
         taxClassId: standardClass.id,
         country: "India",
-        state: "Karnataka", // apna StoreSettings.state jo bhi hai
+        state: "Uttar Pradesh", // apna StoreSettings.state jo bhi hai
         name: "CGST",
         rate: 9,
         appliesWhen: "ORIGIN_MATCH",
@@ -158,7 +158,7 @@ main()
       {
         taxClassId: standardClass.id,
         country: "India",
-        state: "Karnataka",
+        state: "Uttar Pradesh",
         name: "SGST",
         rate: 9,
         appliesWhen: "ORIGIN_MATCH",

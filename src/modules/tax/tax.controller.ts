@@ -79,3 +79,36 @@ export async function deleteTaxRate(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function updateTaxClass(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const { name } = req.body;
+
+    const taxClass = await taxService.updateTaxClassService(id, { name });
+    return res.status(200).json({ message: "Tax class updated", data: taxClass });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}
+
+export async function updateTaxRate(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const { country, state, name, rate, appliesWhen, isCompound, priority } = req.body;
+
+    const taxRate = await taxService.updateTaxRateService(id, {
+      country,
+      state,
+      name,
+      rate: rate !== undefined ? Number(rate) : undefined,
+      appliesWhen,
+      isCompound,
+      priority: priority !== undefined ? Number(priority) : undefined,
+    });
+
+    return res.status(200).json({ message: "Tax rate updated", data: taxRate });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}
