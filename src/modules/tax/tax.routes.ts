@@ -12,9 +12,11 @@ router.use(verifyToken, authorizeRoles(Role.ADMIN));
 router.post("/classes", taxController.createTaxClass);
 router.get("/classes", taxController.getAllTaxClasses);
 router.delete("/classes/:id", taxController.deleteTaxClass);
+router.put("/classes/:id", taxController.updateTaxClass);
 
 router.post("/rates", taxController.createTaxRate);
 router.get("/rates/:taxClassId", taxController.getTaxRatesByClass);
 router.delete("/rates/:id", taxController.deleteTaxRate);
+router.put("/rates/:id", taxController.updateTaxRate);
 
 export default router;
