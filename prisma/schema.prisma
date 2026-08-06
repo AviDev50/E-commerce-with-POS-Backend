@@ -63,6 +63,12 @@ enum TaxApplyWhen {
   ORIGIN_MISMATCH
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -88,6 +94,9 @@ model Customer {
   email         String? 
   cart          Cart?          
   password      String
+  dob           DateTime       @db.Date
+  gender        Gender
+  isActive      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
