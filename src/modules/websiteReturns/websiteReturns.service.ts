@@ -1,6 +1,9 @@
 import prisma from "../../config/db.js";
 import { ReturnStatus, ReturnType, OrderStatus } from "@prisma/client";
-import { withFullImageUrls, formatReturnResponse } from "../../utils/returnFormat.js";
+import {
+  withFullImageUrls,
+  formatReturnResponse,
+} from "../../utils/returnFormat.js";
 
 const RETURN_WINDOW_DAYS = 7;
 
@@ -11,7 +14,10 @@ const ACTIVE_STATUSES: ReturnStatus[] = [
   ReturnStatus.RECEIVED,
 ];
 
-const CANCELLABLE_STATUSES: ReturnStatus[] = [ReturnStatus.REQUESTED, ReturnStatus.APPROVED];
+const CANCELLABLE_STATUSES: ReturnStatus[] = [
+  ReturnStatus.REQUESTED,
+  ReturnStatus.APPROVED,
+];
 
 interface CreateReturnRequestInput {
   orderItemId: string;
@@ -24,20 +30,23 @@ interface CreateReturnRequestInput {
 }
 
 // ==================== CREATE RETURN/EXCHANGE REQUEST ====================
-export async function createReturnRequest(customerId: string, data: CreateReturnRequestInput) {
+export async function createReturnRequest(
+  customerId: string,
+  data: CreateReturnRequestInput,
+) {
   if (data.quantity <= 0) {
     const error: any = new Error("Quantity must be greater than 0");
     error.statusCode = 400;
     throw error;
   }
 
-const orderItem = await prisma.orderItem.findUnique({
-  where: { id: data.orderItemId },
-  include: {
-    order: true,
-    product: { include: { category: true } }, // category chahiye resolve karne ke liye
-  },
-});
+  const orderItem = await prisma.orderItem.findUnique({
+    where: { id: data.orderItemId },
+    include: {
+      order: true,
+      product: { include: { category: true } }, // category chahiye resolve karne ke liye
+    },
+  });
 
   if (!orderItem) {
     const error: any = new Error("Order item not found");
@@ -51,25 +60,32 @@ const orderItem = await prisma.orderItem.findUnique({
     throw error;
   }
 
+  // Resolution order: product-level explicit setting > category default > true (fallback)
+  const isReturnable =
+    orderItem.product.isReturnable ??
+    orderItem.product.category?.isReturnable ??
+    true;
 
-// Resolution order: product-level explicit setting > category default > true (fallback)
-const isReturnable =
-  orderItem.product.isReturnable ?? orderItem.product.category?.isReturnable ?? true;
-
-if (!isReturnable) {
-  const error: any = new Error("This product is not eligible for return or exchange");
-  error.statusCode = 400;
-  throw error;
-}
+  if (!isReturnable) {
+    const error: any = new Error(
+      "This product is not eligible for return or exchange",
+    );
+    error.statusCode = 400;
+    throw error;
+  }
 
   if (orderItem.order.status !== OrderStatus.COMPLETED) {
-    const error: any = new Error("Return can only be requested for completed orders");
+    const error: any = new Error(
+      "Return can only be requested for completed orders",
+    );
     error.statusCode = 400;
     throw error;
   }
 
   if (!orderItem.order.deliveredAt) {
-    const error: any = new Error("This order has not been marked as delivered yet");
+    const error: any = new Error(
+      "This order has not been marked as delivered yet",
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -78,7 +94,9 @@ if (!isReturnable) {
   windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
 
   if (new Date() > windowEnd) {
-    const error: any = new Error(`Return window of ${RETURN_WINDOW_DAYS} days has expired`);
+    const error: any = new Error(
+      `Return window of ${RETURN_WINDOW_DAYS} days has expired`,
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -87,18 +105,26 @@ if (!isReturnable) {
     where: { orderItemId: data.orderItemId, status: { in: ACTIVE_STATUSES } },
     select: { quantity: true },
   });
-  const alreadyPendingQty = activeReturns.reduce((sum, r) => sum + r.quantity, 0);
-  const availableQty = orderItem.quantity - orderItem.returnedQty - alreadyPendingQty;
+  const alreadyPendingQty = activeReturns.reduce(
+    (sum, r) => sum + r.quantity,
+    0,
+  );
+  const availableQty =
+    orderItem.quantity - orderItem.returnedQty - alreadyPendingQty;
 
   if (data.quantity > availableQty) {
-    const error: any = new Error(`Only ${availableQty} unit(s) of this item are eligible for return`);
+    const error: any = new Error(
+      `Only ${availableQty} unit(s) of this item are eligible for return`,
+    );
     error.statusCode = 400;
     throw error;
   }
 
   if (data.type === ReturnType.EXCHANGE) {
     if (!data.exchangeVariantId) {
-      const error: any = new Error("exchangeVariantId is required for exchange requests");
+      const error: any = new Error(
+        "exchangeVariantId is required for exchange requests",
+      );
       error.statusCode = 400;
       throw error;
     }
@@ -114,7 +140,9 @@ if (!isReturnable) {
     }
 
     if (exchangeVariant.productId !== orderItem.productId) {
-      const error: any = new Error("Exchange variant must belong to the same product");
+      const error: any = new Error(
+        "Exchange variant must belong to the same product",
+      );
       error.statusCode = 400;
       throw error;
     }
@@ -128,10 +156,14 @@ if (!isReturnable) {
       reason: data.reason,
       reasonNote: data.reasonNote,
       // string[] aaya hai input mein — DB mein Product/Variant jaisa hi JSON string bana ke store
-      images: data.images && data.images.length > 0 ? JSON.stringify(data.images) : null,
+      images:
+        data.images && data.images.length > 0
+          ? JSON.stringify(data.images)
+          : null,
       quantity: data.quantity,
       status: ReturnStatus.REQUESTED,
-      exchangeVariantId: data.type === ReturnType.EXCHANGE ? data.exchangeVariantId : null,
+      exchangeVariantId:
+        data.type === ReturnType.EXCHANGE ? data.exchangeVariantId : null,
     },
   });
 
@@ -149,7 +181,9 @@ export async function listMyReturns(customerId: string) {
           order: { select: { id: true, orderNumber: true } },
         },
       },
-      exchangeVariant: { select: { id: true, name: true, price: true, images: true } },
+      exchangeVariant: {
+        select: { id: true, name: true, price: true, images: true },
+      },
       refund: true,
     },
     orderBy: { createdAt: "desc" },
@@ -190,7 +224,9 @@ export async function cancelMyReturn(customerId: string, id: string) {
   }
 
   if (!CANCELLABLE_STATUSES.includes(existing.status)) {
-    const error: any = new Error(`Cannot cancel a return in ${existing.status} status`);
+    const error: any = new Error(
+      `Cannot cancel a return in ${existing.status} status`,
+    );
     error.statusCode = 400;
     throw error;
   }

@@ -81,7 +81,8 @@ async function resolveOrderItems(
       price = Number(product.price);
     }
 
-    const taxClassId = product.taxClassId ?? product.category?.taxClassId ?? null;
+    const taxClassId =
+      product.taxClassId ?? product.category?.taxClassId ?? null;
 
     resolved.push({
       productId: item.productId,
@@ -255,17 +256,17 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         tax: totalTax,
         discount,
         total,
-    orderItems: {
-  create: itemsWithTax.map((i) => ({
-    productId: i.productId,
-    variantId: i.variantId,
-    quantity: i.quantity,
-    price: i.price,
-    subtotal: i.subtotal,
-    taxAmount: i.taxAmount,
- taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
-  })),
-},
+        orderItems: {
+          create: itemsWithTax.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.subtotal,
+            taxAmount: i.taxAmount,
+            taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+          })),
+        },
         payment: {
           create: { method: data.paymentMethod, status: "PAID", amount: total },
         },
@@ -336,25 +337,30 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
         tax: totalTax,
         discount,
         total,
-     orderItems: {
-  create: itemsWithTax.map((i) => ({
-    productId: i.productId,
-    variantId: i.variantId,
-    quantity: i.quantity,
-    price: i.price,
-    subtotal: i.subtotal,
-    taxAmount: i.taxAmount,
-   taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
-  })),
-},
-        payment: { create: { method: "COD", status: "PENDING", amount: total } },
+        orderItems: {
+          create: itemsWithTax.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.subtotal,
+            taxAmount: i.taxAmount,
+            taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+          })),
+        },
+        payment: {
+          create: { method: "COD", status: "PENDING", amount: total },
+        },
       },
       include: { orderItems: true, payment: true },
     });
 
     if (data.cartItemIds && data.cartItemIds.length > 0) {
       await tx.cartItem.deleteMany({
-        where: { id: { in: data.cartItemIds }, cart: { customerId: data.customerId } },
+        where: {
+          id: { in: data.cartItemIds },
+          cart: { customerId: data.customerId },
+        },
       });
     }
 
@@ -365,7 +371,9 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
 // ==================== PREVIEW (read-only) ====================
 
 export async function previewOnlineOrderService(data: PreviewOrderInput) {
-  const address = await prisma.address.findUnique({ where: { id: data.addressId } });
+  const address = await prisma.address.findUnique({
+    where: { id: data.addressId },
+  });
   if (!address || address.customerId !== data.customerId) {
     throw new Error("Address not found");
   }
@@ -374,11 +382,16 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
   const storeCountry = storeSettings?.country ?? null;
   const storeState = storeSettings?.state ?? null;
 
-  const resolvedItems = await resolveOrderItems(prisma as unknown as Prisma.TransactionClient, data.items);
+  const resolvedItems = await resolveOrderItems(
+    prisma as unknown as Prisma.TransactionClient,
+    data.items,
+  );
 
   const itemsWithDetails = await Promise.all(
     resolvedItems.map(async (item) => {
-      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+      });
 
       let availableStock = product?.stock ?? 0;
       let image: string | null = null;
@@ -389,7 +402,9 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
       }
 
       if (item.variantId) {
-        const variant = await prisma.productVariant.findUnique({ where: { id: item.variantId } });
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: item.variantId },
+        });
         availableStock = variant?.stock ?? 0;
         if (variant?.images) {
           const parsedVariant = JSON.parse(variant.images || "[]");
@@ -397,11 +412,19 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
         }
       }
 
-      return { ...item, availableStock, inStock: availableStock >= item.quantity, image };
+      return {
+        ...item,
+        availableStock,
+        inStock: availableStock >= item.quantity,
+        image,
+      };
     }),
   );
 
-  const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const subtotal = resolvedItems.reduce(
+    (sum, i) => sum + i.price * i.quantity,
+    0,
+  );
 
   let discount = 0;
   let couponError: string | undefined;
@@ -444,7 +467,8 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
     discount,
     tax: totalTax,
     total,
-    couponApplied: data.couponCode && !couponError ? data.couponCode.toUpperCase() : null,
+    couponApplied:
+      data.couponCode && !couponError ? data.couponCode.toUpperCase() : null,
     couponError: couponError ?? null,
   };
 }
@@ -595,7 +619,11 @@ export async function refundOrderService(
   });
 }
 
-export async function cancelOrderService(id: string, customerId: string, reason: string) {
+export async function cancelOrderService(
+  id: string,
+  customerId: string,
+  reason: string,
+) {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id },
@@ -606,8 +634,14 @@ export async function cancelOrderService(id: string, customerId: string, reason:
       throw new Error("Order not found");
     }
 
-    if (order.status === "CANCELLED" || order.status === "COMPLETED" || order.status === "REFUNDED") {
-      throw new Error(`Order cannot be cancelled — current status is ${order.status}`);
+    if (
+      order.status === "CANCELLED" ||
+      order.status === "COMPLETED" ||
+      order.status === "REFUNDED"
+    ) {
+      throw new Error(
+        `Order cannot be cancelled — current status is ${order.status}`,
+      );
     }
 
     await restoreStock(tx, order.orderItems);
@@ -615,7 +649,10 @@ export async function cancelOrderService(id: string, customerId: string, reason:
     await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
 
     if (order.payment) {
-      await tx.payment.update({ where: { id: order.payment.id }, data: { status: "FAILED" } });
+      await tx.payment.update({
+        where: { id: order.payment.id },
+        data: { status: "FAILED" },
+      });
     }
 
     return tx.refund.create({

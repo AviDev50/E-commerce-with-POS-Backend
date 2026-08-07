@@ -6,7 +6,14 @@ import { getParam } from "../../utils/getParam.js";
 export async function createReturnRequest(req: Request, res: Response) {
   try {
     const customerId = req.customer!.id;
-    const { orderItemId, type, reason, reasonNote, quantity, exchangeVariantId } = req.body;
+    const {
+      orderItemId,
+      type,
+      reason,
+      reasonNote,
+      quantity,
+      exchangeVariantId,
+    } = req.body;
 
     const files = req.files as Express.Multer.File[] | undefined;
     const images = files ? files.map((f) => f.filename) : undefined; // ab plain array, JSON.stringify nahi
@@ -23,7 +30,9 @@ export async function createReturnRequest(req: Request, res: Response) {
 
     res.status(201).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
@@ -33,24 +42,36 @@ export async function listMyReturns(req: Request, res: Response) {
     const data = await service.listMyReturns(req.customer!.id);
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function getMyReturnById(req: Request, res: Response) {
   try {
-    const data = await service.getMyReturnById(req.customer!.id, getParam(req.params.id));
+    const data = await service.getMyReturnById(
+      req.customer!.id,
+      getParam(req.params.id),
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function cancelMyReturn(req: Request, res: Response) {
   try {
-    const data = await service.cancelMyReturn(req.customer!.id, getParam(req.params.id));
+    const data = await service.cancelMyReturn(
+      req.customer!.id,
+      getParam(req.params.id),
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
