@@ -7,6 +7,7 @@ interface CreateCategoryInput {
   parentId?: string;
  taxClassId?: string;
   image?: string;
+    isReturnable?: boolean; // omit kiya to schema ka @default(true) apply hoga
 }
 
 interface UpdateCategoryInput {
@@ -15,6 +16,7 @@ interface UpdateCategoryInput {
   parentId?: string;
  taxClassId?: string;
   image?: string;
+    isReturnable?: boolean;
 }
 
 function generateSlug(input: string): string {
@@ -47,6 +49,7 @@ export async function createCategoryService(data: CreateCategoryInput) {
       parentId: data.parentId,
       taxClassId: data.taxClassId,
       image: data.image,
+      isReturnable: data.isReturnable, // undefined pass hoga to Prisma khud @default(true) le lega
     },
   });
 

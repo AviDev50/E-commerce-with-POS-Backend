@@ -14,6 +14,7 @@ interface CreateProductInput {
   stock?: number;
   lowStockThreshold?: number;
   images: string[];
+  isReturnable?: boolean; // admin explicit set kare to override, warna undefined = category-default
 }
 
 interface UpdateProductInput {
@@ -29,6 +30,7 @@ interface UpdateProductInput {
   lowStockThreshold?: number;
   images?: string[];
   isActive?: boolean;
+  isReturnable?: boolean;
 }
 
 interface ProductListQuery {
@@ -116,6 +118,7 @@ const product = await prisma.product.create({
     stock: data.stock ?? 0,
     lowStockThreshold: data.lowStockThreshold ?? 5,
     images: JSON.stringify(data.images ?? []),
+     isReturnable: data.isReturnable, // explicit diya to wahi, warna null (= category-default resolve hoga read-time pe)
   },
 });
 
@@ -184,8 +187,12 @@ export async function getProductByIdService(id: string) {
 
   const formatted = withFullImageUrls(product);
 
+  // Resolution: product-level explicit setting > category default > true (fallback)
+  const resolvedIsReturnable = product.isReturnable ?? product.category?.isReturnable ?? true;
+
   return {
     ...formatted,
+    isReturnable: resolvedIsReturnable, // raw product.isReturnable (jo null bhi ho sakta hai) ko yahan overwrite kar rahe hain resolved value se
     category: product.category
       ? { ...product.category, image: product.category.image ? formatImageUrl(product.category.image) : null }
       : null,
