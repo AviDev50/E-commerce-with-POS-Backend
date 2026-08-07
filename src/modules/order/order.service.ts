@@ -4,6 +4,7 @@ import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { computeCouponDiscount } from "../../utils/couponValidator.js";
 import { formatImageUrl } from "../../utils/formatImageUrl.js";
+import { OrderStatus } from "@prisma/client";
 
 interface OrderItemInput {
   productId: string;
@@ -524,12 +525,31 @@ export async function getOrderByIdService(id: string) {
 export async function updateOrderStatusService(id: string, status: string) {
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) {
-    throw new Error("Order not found");
+    const error: any = new Error("Order not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // "as any" pehle silently invalid string bhi accept kar leta tha —
+  // ab enum se validate karo taaki DB mein galat status na jaye
+  if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
+    const error: any = new Error(`Invalid order status: ${status}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const data: any = { status: status as OrderStatus };
+
+  // COMPLETED pe hi deliveredAt set karo — aur sirf tab jab pehle se set nahi hai,
+  // warna baar-baar status COMPLETED → PROCESSING → COMPLETED toggle hone pe
+  // deliveredAt reset ho jayega aur return window customer ke against unfair reset ho jayegi
+  if (status === OrderStatus.COMPLETED && !order.deliveredAt) {
+    data.deliveredAt = new Date();
   }
 
   return prisma.order.update({
     where: { id },
-    data: { status: status as any },
+    data,
   });
 }
 

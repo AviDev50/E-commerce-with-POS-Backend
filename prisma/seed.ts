@@ -39,6 +39,8 @@ const permissions = [
 
   { key: "review:moderate", description: "Approve or reject reviews" },
   { key: "review:delete", description: "Delete any review" },
+   { key: "return:view", description: "to return product" },
+      { key: "return:manage", description: "to return product management" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -76,6 +78,8 @@ const defaultRoleMapping: Record<string, Role[]> = {
 
   "review:moderate": [Role.ADMIN, Role.MANAGER],
   "review:delete": [Role.ADMIN, Role.MANAGER],
+  "return:view":[Role.ADMIN, Role.MANAGER],
+   "return:manage":[Role.ADMIN, Role.MANAGER],
 };
 
 async function seedBootstrapAdmin() {
