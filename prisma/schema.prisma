@@ -158,6 +158,7 @@ model Category {
     taxClass   TaxClass? @relation(fields: [taxClassId], references: [id])
 
   isReturnable Boolean @default(true)
+  returnPolicyText String? @db.Text
 
   products Product[]
 
@@ -177,6 +178,7 @@ model Product {
   images            String?
   isActive          Boolean   @default(true)
     isReturnable      Boolean?
+    returnPolicyText String?  @db.Text
   stock             Int       @default(0)
   lowStockThreshold Int       @default(5)
   categoryId        String?

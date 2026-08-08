@@ -5,7 +5,11 @@ import * as productService from "./product.service.js";
 
 export async function createProduct(req: Request, res: Response) {
   try {
-    const { name, slug, description, sku, price, costPrice, taxClassId, categoryId, stock, lowStockThreshold } = req.body;
+    const {
+      name, slug, description, sku, price, costPrice,
+      taxClassId, categoryId, stock, lowStockThreshold,
+      isReturnable, returnPolicyText,
+    } = req.body;
 
     if (!name || !sku || !price) {
       return res.status(400).json({ message: "name, sku, and price are required" });
@@ -15,17 +19,15 @@ export async function createProduct(req: Request, res: Response) {
     const images = files.map((file) => `/uploads/${file.filename}`);
 
     const product = await productService.createProductService({
-      name,
-      slug,
-      description,
-      sku,
+      name, slug, description, sku,
       price: Number(price),
       costPrice: costPrice ? Number(costPrice) : undefined,
-     taxClassId,
-      categoryId,
+      taxClassId, categoryId,
       stock: stock ? Number(stock) : undefined,
       lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
       images,
+      isReturnable: isReturnable !== undefined ? (isReturnable === "true" || isReturnable === true) : undefined,
+      returnPolicyText,
     });
 
     return res.status(201).json({ message: "Product created", data: product });
@@ -51,7 +53,9 @@ export async function getAllProducts(req: Request, res: Response) {
       includeInactive: Boolean(canSeeInactive),
     });
 
-    return res.status(200).json({ data: result.products, pagination: result.pagination });
+    return res
+      .status(200)
+      .json({ data: result.products, pagination: result.pagination });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
   }
@@ -70,24 +74,26 @@ export async function getProductById(req: Request, res: Response) {
 export async function updateProduct(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const { name, slug, description, sku, price, costPrice, taxClassId, categoryId, stock, lowStockThreshold, isActive } = req.body;
+    const {
+      name, slug, description, sku, price, costPrice,
+      taxClassId, categoryId, stock, lowStockThreshold, isActive,
+      isReturnable, returnPolicyText,
+    } = req.body;
 
     const files = (req.files as Express.Multer.File[]) || [];
     const images = files.length > 0 ? files.map((file) => `/uploads/${file.filename}`) : undefined;
 
     const product = await productService.updateProductService(id, {
-      name,
-      slug,
-      description,
-      sku,
+      name, slug, description, sku,
       price: price ? Number(price) : undefined,
       costPrice: costPrice ? Number(costPrice) : undefined,
-     taxClassId,
-      categoryId,
+      taxClassId, categoryId,
       stock: stock ? Number(stock) : undefined,
       lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
       images,
-      isActive: isActive !== undefined ? isActive === "true" || isActive === true : undefined,
+      isActive: isActive !== undefined ? (isActive === "true" || isActive === true) : undefined,
+      isReturnable: isReturnable !== undefined ? (isReturnable === "true" || isReturnable === true) : undefined,
+      returnPolicyText,
     });
 
     return res.status(200).json({ message: "Product updated", data: product });
@@ -114,7 +120,9 @@ export async function createVariant(req: Request, res: Response) {
     const { name, sku, price, stock, attributes } = req.body;
 
     if (!name || !sku || !price || !attributes) {
-      return res.status(400).json({ message: "name, sku, price, and attributes are required" });
+      return res
+        .status(400)
+        .json({ message: "name, sku, price, and attributes are required" });
     }
 
     const variant = await productService.createVariantService(productId, {
@@ -134,7 +142,8 @@ export async function createVariant(req: Request, res: Response) {
 export async function getVariantsByProduct(req: Request, res: Response) {
   try {
     const productId = req.params.id as string;
-    const variants = await productService.getVariantsByProductService(productId);
+    const variants =
+      await productService.getVariantsByProductService(productId);
     return res.status(200).json({ data: variants });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
@@ -157,7 +166,9 @@ export async function generateVariants(req: Request, res: Response) {
     const { attributeGroups, basePrice, baseStock } = req.body;
 
     if (!attributeGroups || !basePrice) {
-      return res.status(400).json({ message: "attributeGroups and basePrice are required" });
+      return res
+        .status(400)
+        .json({ message: "attributeGroups and basePrice are required" });
     }
 
     const variants = await productService.generateVariantsService(productId, {
@@ -181,7 +192,10 @@ export async function updateVariant(req: Request, res: Response) {
     const { name, price, stock } = req.body;
 
     const files = (req.files as Express.Multer.File[]) || [];
-    const images = files.length > 0 ? files.map((file) => `/uploads/${file.filename}`) : undefined;
+    const images =
+      files.length > 0
+        ? files.map((file) => `/uploads/${file.filename}`)
+        : undefined;
 
     const variant = await productService.updateVariantService(variantId, {
       name,

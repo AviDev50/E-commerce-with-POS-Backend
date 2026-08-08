@@ -60,7 +60,7 @@ router.put(
   verifyToken,
   checkPermission("product:update"),
   upload.array("images", 5),
-  productController.updateVariant
+  productController.updateVariant,
 );
 
 export default router;

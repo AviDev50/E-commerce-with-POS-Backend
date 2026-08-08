@@ -12,8 +12,25 @@ router.get("/:id", categoryController.getCategoryById);
 
 // Protected — staff only
 
-router.post("/", verifyToken, checkPermission("category:create"), upload.single("image"), categoryController.createCategory);
-router.put("/:id", verifyToken, checkPermission("category:update"), upload.single("image"), categoryController.updateCategory);
-router.delete("/:id", verifyToken, checkPermission("category:delete"), categoryController.deleteCategory);
+router.post(
+  "/",
+  verifyToken,
+  checkPermission("category:create"),
+  upload.single("image"),
+  categoryController.createCategory,
+);
+router.put(
+  "/:id",
+  verifyToken,
+  checkPermission("category:update"),
+  upload.single("image"),
+  categoryController.updateCategory,
+);
+router.delete(
+  "/:id",
+  verifyToken,
+  checkPermission("category:delete"),
+  categoryController.deleteCategory,
+);
 
 export default router;

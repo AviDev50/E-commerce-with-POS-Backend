@@ -5,18 +5,20 @@ interface CreateCategoryInput {
   name: string;
   slug?: string;
   parentId?: string;
- taxClassId?: string;
+  taxClassId?: string;
   image?: string;
-    isReturnable?: boolean; // omit kiya to schema ka @default(true) apply hoga
+  isReturnable?: boolean; // omit kiya to schema ka @default(true) apply hoga
+  returnPolicyText?: string;
 }
 
 interface UpdateCategoryInput {
   name?: string;
   slug?: string;
   parentId?: string;
- taxClassId?: string;
+  taxClassId?: string;
   image?: string;
-    isReturnable?: boolean;
+  isReturnable?: boolean;
+  returnPolicyText?: string;
 }
 
 function generateSlug(input: string): string {
@@ -36,7 +38,9 @@ export async function createCategoryService(data: CreateCategoryInput) {
   }
 
   if (data.parentId) {
-    const parent = await prisma.category.findUnique({ where: { id: data.parentId } });
+    const parent = await prisma.category.findUnique({
+      where: { id: data.parentId },
+    });
     if (!parent) {
       throw new Error("Parent category not found");
     }
@@ -50,16 +54,24 @@ export async function createCategoryService(data: CreateCategoryInput) {
       taxClassId: data.taxClassId,
       image: data.image,
       isReturnable: data.isReturnable, // undefined pass hoga to Prisma khud @default(true) le lega
+        returnPolicyText: data.returnPolicyText,
     },
   });
 
-  return { ...category, image: category.image ? formatImageUrl(category.image) : null };
+  return {
+    ...category,
+    image: category.image ? formatImageUrl(category.image) : null,
+  };
 }
 
 export async function getAllCategoriesService(topLevelOnly?: boolean) {
   const categories = await prisma.category.findMany({
     where: topLevelOnly ? { parentId: null } : {},
-    include: { parent: true, children: true, _count: { select: { products: true } } },
+    include: {
+      parent: true,
+      children: true,
+      _count: { select: { products: true } },
+    },
     orderBy: { name: "asc" },
   });
 
@@ -71,7 +83,10 @@ export async function getAllCategoriesService(topLevelOnly?: boolean) {
       image: child.image ? formatImageUrl(child.image) : null,
     })),
     parent: cat.parent
-      ? { ...cat.parent, image: cat.parent.image ? formatImageUrl(cat.parent.image) : null }
+      ? {
+          ...cat.parent,
+          image: cat.parent.image ? formatImageUrl(cat.parent.image) : null,
+        }
       : null,
   }));
 }
@@ -79,7 +94,11 @@ export async function getAllCategoriesService(topLevelOnly?: boolean) {
 export async function getCategoryByIdService(id: string) {
   const category = await prisma.category.findUnique({
     where: { id },
-    include: { parent: true, children: true, _count: { select: { products: true } } },
+    include: {
+      parent: true,
+      children: true,
+      _count: { select: { products: true } },
+    },
   });
 
   if (!category) {
@@ -94,12 +113,20 @@ export async function getCategoryByIdService(id: string) {
       image: child.image ? formatImageUrl(child.image) : null,
     })),
     parent: category.parent
-      ? { ...category.parent, image: category.parent.image ? formatImageUrl(category.parent.image) : null }
+      ? {
+          ...category.parent,
+          image: category.parent.image
+            ? formatImageUrl(category.parent.image)
+            : null,
+        }
       : null,
   };
 }
 
-export async function updateCategoryService(id: string, data: UpdateCategoryInput) {
+export async function updateCategoryService(
+  id: string,
+  data: UpdateCategoryInput,
+) {
   const existing = await prisma.category.findUnique({ where: { id } });
   if (!existing) {
     throw new Error("Category not found");
@@ -108,7 +135,9 @@ export async function updateCategoryService(id: string, data: UpdateCategoryInpu
   let slug = existing.slug;
   if (data.slug || data.name) {
     slug = generateSlug(data.slug || data.name || existing.name);
-    const slugTaken = await prisma.category.findFirst({ where: { slug, NOT: { id } } });
+    const slugTaken = await prisma.category.findFirst({
+      where: { slug, NOT: { id } },
+    });
     if (slugTaken) {
       throw new Error("A category with this slug already exists");
     }
@@ -118,7 +147,9 @@ export async function updateCategoryService(id: string, data: UpdateCategoryInpu
     if (data.parentId === id) {
       throw new Error("A category cannot be its own parent");
     }
-    const parent = await prisma.category.findUnique({ where: { id: data.parentId } });
+    const parent = await prisma.category.findUnique({
+      where: { id: data.parentId },
+    });
     if (!parent) {
       throw new Error("Parent category not found");
     }
@@ -129,7 +160,10 @@ export async function updateCategoryService(id: string, data: UpdateCategoryInpu
     data: { ...data, slug },
   });
 
-  return { ...updated, image: updated.image ? formatImageUrl(updated.image) : null };
+  return {
+    ...updated,
+    image: updated.image ? formatImageUrl(updated.image) : null,
+  };
 }
 
 export async function deleteCategoryService(id: string) {
@@ -143,7 +177,9 @@ export async function deleteCategoryService(id: string) {
   }
 
   if (existing._count.products > 0) {
-    throw new Error("Cannot delete category — products are still assigned to it");
+    throw new Error(
+      "Cannot delete category — products are still assigned to it",
+    );
   }
 
   if (existing._count.children > 0) {
@@ -152,5 +188,3 @@ export async function deleteCategoryService(id: string) {
 
   return prisma.category.delete({ where: { id } });
 }
-
-
