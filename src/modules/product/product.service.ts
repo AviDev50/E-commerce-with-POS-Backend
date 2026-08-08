@@ -9,12 +9,13 @@ interface CreateProductInput {
   sku: string;
   price: number;
   costPrice?: number;
- taxClassId?: string;
+  taxClassId?: string;
   categoryId?: string;
   stock?: number;
   lowStockThreshold?: number;
   images: string[];
   isReturnable?: boolean; // admin explicit set kare to override, warna undefined = category-default
+  returnPolicyText?: string;
 }
 
 interface UpdateProductInput {
@@ -24,13 +25,14 @@ interface UpdateProductInput {
   sku?: string;
   price?: number;
   costPrice?: number;
- taxClassId?: string;
+  taxClassId?: string;
   categoryId?: string;
   stock?: number;
   lowStockThreshold?: number;
   images?: string[];
   isActive?: boolean;
   isReturnable?: boolean;
+  returnPolicyText?: string;
 }
 
 interface ProductListQuery {
@@ -72,7 +74,6 @@ interface UpdateVariantInput {
   images?: string[];
 }
 
-
 function generateSlug(input: string): string {
   return input
     .toLowerCase()
@@ -86,7 +87,9 @@ function generateSlug(input: string): string {
 // }
 
 function withFullImageUrls<T extends { images: string | null }>(product: T) {
-  const imagesArray: string[] = product.images ? JSON.parse(product.images) : [];
+  const imagesArray: string[] = product.images
+    ? JSON.parse(product.images)
+    : [];
   return { ...product, images: formatImageUrls(imagesArray) };
 }
 
@@ -95,7 +98,9 @@ function withFullImageUrls<T extends { images: string | null }>(product: T) {
 export async function createProductService(data: CreateProductInput) {
   const slug = generateSlug(data.slug || data.name);
 
-  const existingSku = await prisma.product.findUnique({ where: { sku: data.sku } });
+  const existingSku = await prisma.product.findUnique({
+    where: { sku: data.sku },
+  });
   if (existingSku) {
     throw new Error("A product with this SKU already exists");
   }
@@ -105,24 +110,25 @@ export async function createProductService(data: CreateProductInput) {
     throw new Error("A product with this slug already exists");
   }
 
-const product = await prisma.product.create({
-  data: {
-    name: data.name,
-    slug,
-    description: data.description,
-    sku: data.sku,
-    price: data.price,
-    costPrice: data.costPrice,
-  taxClassId: data.taxClassId,
-    categoryId: data.categoryId,
-    stock: data.stock ?? 0,
-    lowStockThreshold: data.lowStockThreshold ?? 5,
-    images: JSON.stringify(data.images ?? []),
-     isReturnable: data.isReturnable, // explicit diya to wahi, warna null (= category-default resolve hoga read-time pe)
-  },
-});
+  const product = await prisma.product.create({
+    data: {
+      name: data.name,
+      slug,
+      description: data.description,
+      sku: data.sku,
+      price: data.price,
+      costPrice: data.costPrice,
+      taxClassId: data.taxClassId,
+      categoryId: data.categoryId,
+      stock: data.stock ?? 0,
+      lowStockThreshold: data.lowStockThreshold ?? 5,
+      images: JSON.stringify(data.images ?? []),
+      isReturnable: data.isReturnable, // explicit diya to wahi, warna null (= category-default resolve hoga read-time pe)
+        returnPolicyText: data.returnPolicyText,
+    },
+  });
 
-return withFullImageUrls(product);
+  return withFullImageUrls(product);
 }
 
 export async function getAllProductsService(query: ProductListQuery) {
@@ -141,7 +147,7 @@ export async function getAllProductsService(query: ProductListQuery) {
   }
 
   if (query.search) {
-    where.name = { contains: query.search};
+    where.name = { contains: query.search };
   }
 
   const [products, total] = await Promise.all([
@@ -155,10 +161,16 @@ export async function getAllProductsService(query: ProductListQuery) {
     prisma.product.count({ where }),
   ]);
 
-return {
-  products: products.map(withFullImageUrls),
-  pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-};
+  return {
+    products: products.map((p) => ({
+      ...withFullImageUrls(p),
+      // Resolution: product-level explicit setting > category default > true (fallback)
+      // getProductByIdService jaisa hi logic — listing pe bhi badge dikhane ke liye
+      isReturnable: p.isReturnable ?? p.category?.isReturnable ?? true,
+      returnPolicyText: p.returnPolicyText ?? p.category?.returnPolicyText ?? null,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 export async function getProductByIdService(id: string) {
@@ -189,12 +201,19 @@ export async function getProductByIdService(id: string) {
 
   // Resolution: product-level explicit setting > category default > true (fallback)
   const resolvedIsReturnable = product.isReturnable ?? product.category?.isReturnable ?? true;
+const resolvedReturnPolicyText = product.returnPolicyText ?? product.category?.returnPolicyText ?? null;
 
   return {
     ...formatted,
-    isReturnable: resolvedIsReturnable, // raw product.isReturnable (jo null bhi ho sakta hai) ko yahan overwrite kar rahe hain resolved value se
+    isReturnable: resolvedIsReturnable,
+    returnPolicyText: resolvedReturnPolicyText, // raw product.isReturnable (jo null bhi ho sakta hai) ko yahan overwrite kar rahe hain resolved value se
     category: product.category
-      ? { ...product.category, image: product.category.image ? formatImageUrl(product.category.image) : null }
+      ? {
+          ...product.category,
+          image: product.category.image
+            ? formatImageUrl(product.category.image)
+            : null,
+        }
       : null,
     variants: product.variants.map((v) => ({
       ...v,
@@ -215,14 +234,19 @@ export async function getProductByIdService(id: string) {
   };
 }
 
-export async function updateProductService(id: string, data: UpdateProductInput) {
+export async function updateProductService(
+  id: string,
+  data: UpdateProductInput,
+) {
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) {
     throw new Error("Product not found");
   }
 
   if (data.sku && data.sku !== existing.sku) {
-    const skuTaken = await prisma.product.findUnique({ where: { sku: data.sku } });
+    const skuTaken = await prisma.product.findUnique({
+      where: { sku: data.sku },
+    });
     if (skuTaken) {
       throw new Error("A product with this SKU already exists");
     }
@@ -231,7 +255,9 @@ export async function updateProductService(id: string, data: UpdateProductInput)
   let slug = existing.slug;
   if (data.slug) {
     slug = generateSlug(data.slug);
-    const slugTaken = await prisma.product.findFirst({ where: { slug, NOT: { id } } });
+    const slugTaken = await prisma.product.findFirst({
+      where: { slug, NOT: { id } },
+    });
     if (slugTaken) {
       throw new Error("A product with this slug already exists");
     }
@@ -246,7 +272,10 @@ export async function updateProductService(id: string, data: UpdateProductInput)
     ...(images ? { images: JSON.stringify(images) } : {}),
   };
 
-  const updated = await prisma.product.update({ where: { id }, data: updateData });
+  const updated = await prisma.product.update({
+    where: { id },
+    data: updateData,
+  });
   return withFullImageUrls(updated);
 }
 
@@ -261,13 +290,18 @@ export async function deleteProductService(id: string) {
 
 // ==================== VARIANT SERVICES ====================
 
-export async function createVariantService(productId: string, data: CreateVariantInput) {
+export async function createVariantService(
+  productId: string,
+  data: CreateVariantInput,
+) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
     throw new Error("Product not found");
   }
 
-  const existingSku = await prisma.productVariant.findUnique({ where: { sku: data.sku } });
+  const existingSku = await prisma.productVariant.findUnique({
+    where: { sku: data.sku },
+  });
   if (existingSku) {
     throw new Error("A variant with this SKU already exists");
   }
@@ -275,7 +309,9 @@ export async function createVariantService(productId: string, data: CreateVarian
   const attributeValueIds: string[] = [];
 
   for (const attr of data.attributes) {
-    const attribute = await prisma.attribute.findUnique({ where: { id: attr.attributeId } });
+    const attribute = await prisma.attribute.findUnique({
+      where: { id: attr.attributeId },
+    });
     if (!attribute) {
       throw new Error(`Attribute not found: ${attr.attributeId}`);
     }
@@ -302,15 +338,22 @@ export async function createVariantService(productId: string, data: CreateVarian
       stock: data.stock ?? 0,
       images: JSON.stringify([]),
       attributeValues: {
-        create: attributeValueIds.map((attributeValueId) => ({ attributeValueId })),
+        create: attributeValueIds.map((attributeValueId) => ({
+          attributeValueId,
+        })),
       },
     },
     include: {
-      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+      attributeValues: {
+        include: { attributeValue: { include: { attribute: true } } },
+      },
     },
   });
 
-  return { ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) };
+  return {
+    ...variant,
+    images: formatImageUrls(JSON.parse(variant.images || "[]")),
+  };
 }
 
 export async function getVariantsByProductService(productId: string) {
@@ -321,7 +364,11 @@ export async function getVariantsByProductService(productId: string) {
 
   const variants = await prisma.productVariant.findMany({
     where: { productId },
-    include: { attributeValues: { include: { attributeValue: { include: { attribute: true } } } } },
+    include: {
+      attributeValues: {
+        include: { attributeValue: { include: { attribute: true } } },
+      },
+    },
   });
 
   return variants.map((v) => ({
@@ -331,7 +378,9 @@ export async function getVariantsByProductService(productId: string) {
 }
 
 export async function deleteVariantService(variantId: string) {
-  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+  const existing = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+  });
   if (!existing) {
     throw new Error("Variant not found");
   }
@@ -339,8 +388,13 @@ export async function deleteVariantService(variantId: string) {
   return prisma.productVariant.delete({ where: { id: variantId } });
 }
 
-export async function updateVariantService(variantId: string, data: UpdateVariantInput) {
-  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+export async function updateVariantService(
+  variantId: string,
+  data: UpdateVariantInput,
+) {
+  const existing = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+  });
   if (!existing) {
     throw new Error("Variant not found");
   }
@@ -354,21 +408,29 @@ export async function updateVariantService(variantId: string, data: UpdateVarian
       images: data.images ? JSON.stringify(data.images) : undefined,
     },
     include: {
-      attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+      attributeValues: {
+        include: { attributeValue: { include: { attribute: true } } },
+      },
     },
   });
 
-  return { ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) };
+  return {
+    ...variant,
+    images: formatImageUrls(JSON.parse(variant.images || "[]")),
+  };
 }
 // Cartesian product helper — [[A,B],[X,Y]] → [[A,X],[A,Y],[B,X],[B,Y]]
 function cartesianProduct<T>(arrays: T[][]): T[][] {
   return arrays.reduce<T[][]>(
     (acc, curr) => acc.flatMap((combo) => curr.map((item) => [...combo, item])),
-    [[]]
+    [[]],
   );
 }
 
-export async function generateVariantsService(productId: string, data: GenerateVariantsInput) {
+export async function generateVariantsService(
+  productId: string,
+  data: GenerateVariantsInput,
+) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
     throw new Error("Product not found");
@@ -379,10 +441,16 @@ export async function generateVariantsService(productId: string, data: GenerateV
   }
 
   // Har attribute group ke liye find-or-create attribute values, IDs collect karo
-  const resolvedGroups: { attributeId: string; label: string; valueId: string }[][] = [];
+  const resolvedGroups: {
+    attributeId: string;
+    label: string;
+    valueId: string;
+  }[][] = [];
 
   for (const group of data.attributeGroups) {
-    const attribute = await prisma.attribute.findUnique({ where: { id: group.attributeId } });
+    const attribute = await prisma.attribute.findUnique({
+      where: { id: group.attributeId },
+    });
     if (!attribute) {
       throw new Error(`Attribute not found: ${group.attributeId}`);
     }
@@ -390,7 +458,7 @@ export async function generateVariantsService(productId: string, data: GenerateV
     const groupItems = [];
     for (const val of group.values) {
       let attributeValue = await prisma.attributeValue.findFirst({
-        where: { attributeId: group.attributeId, value: { equals: val} },
+        where: { attributeId: group.attributeId, value: { equals: val } },
       });
 
       if (!attributeValue) {
@@ -399,7 +467,11 @@ export async function generateVariantsService(productId: string, data: GenerateV
         });
       }
 
-      groupItems.push({ attributeId: group.attributeId, label: val, valueId: attributeValue.id });
+      groupItems.push({
+        attributeId: group.attributeId,
+        label: val,
+        valueId: attributeValue.id,
+      });
     }
 
     resolvedGroups.push(groupItems);
@@ -412,10 +484,14 @@ export async function generateVariantsService(productId: string, data: GenerateV
 
   for (const combo of combinations) {
     const variantName = combo.map((c) => c.label).join(" - ");
-    const skuSuffix = combo.map((c) => c.label.toUpperCase().replace(/\s+/g, "")).join("-");
+    const skuSuffix = combo
+      .map((c) => c.label.toUpperCase().replace(/\s+/g, ""))
+      .join("-");
     const sku = `${product.sku}-${skuSuffix}`;
 
-    const existingSku = await prisma.productVariant.findUnique({ where: { sku } });
+    const existingSku = await prisma.productVariant.findUnique({
+      where: { sku },
+    });
     if (existingSku) {
       continue; // pehle se bana hua combination skip karo, duplicate error na aaye
     }
@@ -433,11 +509,16 @@ export async function generateVariantsService(productId: string, data: GenerateV
         },
       },
       include: {
-        attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
+        attributeValues: {
+          include: { attributeValue: { include: { attribute: true } } },
+        },
       },
     });
 
-    createdVariants.push({ ...variant, images: formatImageUrls(JSON.parse(variant.images || "[]")) });
+    createdVariants.push({
+      ...variant,
+      images: formatImageUrls(JSON.parse(variant.images || "[]")),
+    });
   }
 
   return createdVariants;
