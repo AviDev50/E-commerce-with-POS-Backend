@@ -20,7 +20,7 @@ const permissions = [
   { key: "category:update", description: "Edit categories" },
   { key: "category:delete", description: "Delete categories" },
 
-   { key: "banner:create", description: "Create homepage banners" },
+  { key: "banner:create", description: "Create homepage banners" },
   { key: "banner:read", description: "View banners" },
   { key: "banner:update", description: "Edit banners" },
   { key: "banner:delete", description: "Delete banners" },
@@ -39,8 +39,9 @@ const permissions = [
 
   { key: "review:moderate", description: "Approve or reject reviews" },
   { key: "review:delete", description: "Delete any review" },
-   { key: "return:view", description: "to return product" },
-      { key: "return:manage", description: "to return product management" },
+  { key: "return:view", description: "to return product" },
+  { key: "return:manage", description: "to return product management" },
+  { key: "dashboard:view", description: "to view dashboard" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -78,13 +79,15 @@ const defaultRoleMapping: Record<string, Role[]> = {
 
   "review:moderate": [Role.ADMIN, Role.MANAGER],
   "review:delete": [Role.ADMIN, Role.MANAGER],
-  "return:view":[Role.ADMIN, Role.MANAGER],
-   "return:manage":[Role.ADMIN, Role.MANAGER],
-   "dashboard:view":[Role.ADMIN, Role.MANAGER]
+  "return:view": [Role.ADMIN, Role.MANAGER],
+  "return:manage": [Role.ADMIN, Role.MANAGER],
+  "dashboard:view": [Role.ADMIN, Role.MANAGER],
 };
 
 async function seedBootstrapAdmin() {
-  const existingAdmin = await prisma.user.findFirst({ where: { role: Role.ADMIN } });
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: Role.ADMIN },
+  });
 
   if (existingAdmin) {
     console.log("ℹ️  Admin already exists, skipping bootstrap admin creation");
@@ -102,7 +105,9 @@ async function seedBootstrapAdmin() {
     },
   });
 
-  console.log("Bootstrap admin created — phone: 9999999999, password: Admin@123");
+  console.log(
+    "Bootstrap admin created — phone: 9999999999, password: Admin@123",
+  );
 }
 
 async function main() {
@@ -124,9 +129,8 @@ async function main() {
     }
   }
 
-    await seedBootstrapAdmin();
-    await seedIndiaTax();
-
+  await seedBootstrapAdmin();
+  await seedIndiaTax();
 
   console.log("✅ Permissions seeded successfully");
 }
@@ -140,14 +144,18 @@ main()
     await prisma.$disconnect();
   });
 
-  async function seedIndiaTax() {
-  const existing = await prisma.taxClass.findUnique({ where: { name: "Standard" } });
+async function seedIndiaTax() {
+  const existing = await prisma.taxClass.findUnique({
+    where: { name: "Standard" },
+  });
   if (existing) {
     console.log("ℹ️  Tax data already seeded, skipping");
     return;
   }
 
-  const standardClass = await prisma.taxClass.create({ data: { name: "Standard" } });
+  const standardClass = await prisma.taxClass.create({
+    data: { name: "Standard" },
+  });
 
   await prisma.taxRate.createMany({
     data: [
