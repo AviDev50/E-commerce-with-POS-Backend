@@ -120,11 +120,11 @@ export async function createReturnRequest(
     throw error;
   }
 
-  if (data.type === ReturnType.EXCHANGE) {
+ if (data.type === ReturnType.EXCHANGE) {
+  // Case 1: Variant-based product — customer size/color badalna chahta hai
+  if (orderItem.variantId) {
     if (!data.exchangeVariantId) {
-      const error: any = new Error(
-        "exchangeVariantId is required for exchange requests",
-      );
+      const error: any = new Error("exchangeVariantId is required to exchange a variant product");
       error.statusCode = 400;
       throw error;
     }
@@ -140,13 +140,25 @@ export async function createReturnRequest(
     }
 
     if (exchangeVariant.productId !== orderItem.productId) {
-      const error: any = new Error(
-        "Exchange variant must belong to the same product",
-      );
+      const error: any = new Error("Exchange variant must belong to the same product");
+      error.statusCode = 400;
+      throw error;
+    }
+  } else {
+    // Case 2: Simple product (no variant) — defect replacement, same product hi wapas milega
+    if (data.exchangeVariantId) {
+      const error: any = new Error("This product has no variants — exchangeVariantId should not be sent");
+      error.statusCode = 400;
+      throw error;
+    }
+    // stock check yahan — same product ka fresh piece available hona chahiye
+    if (orderItem.product.stock < data.quantity) {
+      const error: any = new Error("Replacement stock not available for this product");
       error.statusCode = 400;
       throw error;
     }
   }
+}
 
   const created = await prisma.returnRequest.create({
     data: {

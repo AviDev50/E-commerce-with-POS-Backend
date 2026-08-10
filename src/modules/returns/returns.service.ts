@@ -244,10 +244,10 @@ export async function processRefund(id: string, adminId: string) {
 }
 
 // ==================== PROCESS EXCHANGE (type = EXCHANGE) ====================
-export async function processExchange(id: string, _adminId: string) {
+export async function processExchange(id: string, adminId: string) {
   const existing = await prisma.returnRequest.findUnique({
     where: { id },
-    include: { orderItem: { include: { order: true } } },
+    include: { orderItem: { include: { order: true, product: true } } },
   });
 
   if (!existing) {
@@ -268,37 +268,85 @@ export async function processExchange(id: string, _adminId: string) {
     throw error;
   }
 
-  if (!existing.exchangeVariantId) {
-    const error: any = new Error("No exchange variant specified on this request");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const newVariant = await prisma.productVariant.findUnique({ where: { id: existing.exchangeVariantId } });
-
-  if (!newVariant) {
-    const error: any = new Error("Exchange variant not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (newVariant.stock < existing.quantity) {
-    const error: any = new Error("Exchange variant is out of stock");
-    error.statusCode = 400;
-    throw error;
-  }
-
   const { orderItem } = existing;
-  const priceDiffPerUnit = Number(newVariant.price) - Number(orderItem.price);
-  const totalPriceDiff = Number((priceDiffPerUnit * existing.quantity).toFixed(2));
+
+  // ===== CASE 1: Variant exchange (size/color) =====
+  if (existing.exchangeVariantId) {
+    const newVariant = await prisma.productVariant.findUnique({ where: { id: existing.exchangeVariantId } });
+    if (!newVariant) {
+      const error: any = new Error("Exchange variant not found");
+      error.statusCode = 404;
+      throw error;
+    }
+    if (newVariant.stock < existing.quantity) {
+      const error: any = new Error("Exchange variant is out of stock");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const priceDiffPerUnit = Number(newVariant.price) - Number(orderItem.price);
+    const totalPriceDiff = Number((priceDiffPerUnit * existing.quantity).toFixed(2));
+    const subtotal = Number((Number(newVariant.price) * existing.quantity).toFixed(2));
+
+    return prisma.$transaction(async (tx) => {
+      await tx.productVariant.update({
+        where: { id: newVariant.id },
+        data: { stock: { decrement: existing.quantity } },
+      });
+
+      const exchangeOrder = await tx.order.create({
+        data: {
+          orderNumber: `EXC-${Date.now()}`,
+          channel: OrderChannel.ONLINE,
+          status: OrderStatus.PROCESSING,
+          customerId: existing.customerId,
+          addressId: orderItem.order.addressId,
+          subtotal,
+          tax: 0,
+          discount: 0,
+          total: subtotal,
+          orderItems: {
+            create: {
+              productId: newVariant.productId,
+              variantId: newVariant.id,
+              quantity: existing.quantity,
+              price: newVariant.price,
+              subtotal,
+            },
+          },
+          payment: {
+            create: {
+              method: PaymentMethod.COD,
+              status: totalPriceDiff > 0 ? PaymentStatus.PENDING : PaymentStatus.PAID,
+              amount: totalPriceDiff > 0 ? totalPriceDiff : 0,
+            },
+          },
+        },
+      });
+
+      await tx.returnRequest.update({
+        where: { id },
+        data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id, approvedById: adminId },
+      });
+
+      return exchangeOrder;
+    });
+  }
+
+  // ===== CASE 2: Simple product replacement (same product, defect exchange) =====
+  if (orderItem.product.stock < existing.quantity) {
+    const error: any = new Error("Replacement stock not available for this product");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const subtotal = Number((Number(orderItem.price) * existing.quantity).toFixed(2));
 
   return prisma.$transaction(async (tx) => {
-    await tx.productVariant.update({
-      where: { id: newVariant.id },
+    await tx.product.update({
+      where: { id: orderItem.productId },
       data: { stock: { decrement: existing.quantity } },
     });
-
-    const subtotal = Number((Number(newVariant.price) * existing.quantity).toFixed(2));
 
     const exchangeOrder = await tx.order.create({
       data: {
@@ -308,24 +356,22 @@ export async function processExchange(id: string, _adminId: string) {
         customerId: existing.customerId,
         addressId: orderItem.order.addressId,
         subtotal,
-        tax: 0, // V1: naye variant pe tax dobara calculate nahi kar rahe, future scope
+        tax: 0,
         discount: 0,
         total: subtotal,
         orderItems: {
           create: {
-            productId: newVariant.productId,
-            variantId: newVariant.id,
+            productId: orderItem.productId,
             quantity: existing.quantity,
-            price: newVariant.price,
+            price: orderItem.price,
             subtotal,
           },
         },
         payment: {
           create: {
             method: PaymentMethod.COD,
-            // price zyada hai to delivery pe extra COD lena hai, kam/same hai to PAID maan lo (V1 simplification)
-            status: totalPriceDiff > 0 ? PaymentStatus.PENDING : PaymentStatus.PAID,
-            amount: totalPriceDiff > 0 ? totalPriceDiff : 0,
+            status: PaymentStatus.PAID, // same price hai, price-diff ka sawaal nahi
+            amount: 0,
           },
         },
       },
@@ -333,7 +379,7 @@ export async function processExchange(id: string, _adminId: string) {
 
     await tx.returnRequest.update({
       where: { id },
-      data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id },
+      data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id, approvedById: adminId },
     });
 
     return exchangeOrder;
