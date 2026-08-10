@@ -80,6 +80,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "review:delete": [Role.ADMIN, Role.MANAGER],
   "return:view":[Role.ADMIN, Role.MANAGER],
    "return:manage":[Role.ADMIN, Role.MANAGER],
+   "dashboard:view":[Role.ADMIN, Role.MANAGER]
 };
 
 async function seedBootstrapAdmin() {
