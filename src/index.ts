@@ -26,6 +26,8 @@ import taxRoutes from "./modules/tax/tax.routes.js";
 import customerProfileRoutes from "./modules/customerProfile/customerProfile.routes.js";
 import returnsRoutes from "./modules/returns/returns.routes.js";
 import websiteReturnsRoutes from "./modules/websiteReturns/websiteReturns.routes.js"
+import dashboardRoutes from "./modules/dashboard/dashboard.routes.js"
+
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -71,7 +73,7 @@ app.use("/api/v1/tax", taxRoutes);
 app.use("/api/v1/customer/profile", customerProfileRoutes);
 app.use("/api/v1/website/returns", websiteReturnsRoutes)
 app.use("/api/v1/returns", returnsRoutes)
-
+app.use("/api/v1/dashboard", dashboardRoutes)
 
 // Start Server
 app.listen(PORT, () => {
