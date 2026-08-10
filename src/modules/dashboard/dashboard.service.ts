@@ -155,7 +155,8 @@ export async function getDashboardSummary(query: DashboardSummaryQuery) {
   // ---- Sales overview ----
   const totalRevenue = Number(completedAgg._sum.total ?? 0);
   const completedOrdersCount = completedAgg._count._all;
-  const averageOrderValue = completedOrdersCount > 0 ? totalRevenue / completedOrdersCount : 0;
+  const averageOrderValue =
+    completedOrdersCount > 0 ? totalRevenue / completedOrdersCount : 0;
 
   // ---- Low stock merge (simple products + variants) ----
   const lowStockAlerts = [
