@@ -43,6 +43,7 @@ const permissions = [
   { key: "return:manage", description: "to return product management" },
   { key: "dashboard:view", description: "to view dashboard" },
    { key: "customer:create", description: "to create customer in pos" },
+   {key: "customer:search", description: "to search customer to create pos order"},
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -84,6 +85,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "return:manage": [Role.ADMIN, Role.MANAGER],
   "dashboard:view": [Role.ADMIN, Role.MANAGER],
    "customer:create": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+   "customer:search":[Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
 
 async function seedBootstrapAdmin() {
