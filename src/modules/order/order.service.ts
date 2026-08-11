@@ -12,11 +12,18 @@ interface OrderItemInput {
   quantity: number;
 }
 
+// naya — ek single payment entry ka shape (split payment ke liye array mein use hoga)
+interface PaymentInput {
+  method: PaymentMethod;
+  amount: number;
+  transactionRef?: string; // optional — CARD/UPI ke liye reference number store karna ho to
+}
+
 interface CreatePosOrderInput {
   items: OrderItemInput[];
   customerId?: string;
   couponCode?: string;
-  paymentMethod: PaymentMethod;
+  payments: PaymentInput[]; // paymentMethod (single) ki jagah ab ye array hai
   createdById: string;
 }
 
@@ -26,7 +33,7 @@ interface CreateOnlineOrderInput {
   couponCode?: string;
   customerId: string;
   cartItemIds?: string[];
-  paymentMethod: PaymentMethod;
+  paymentMethod: PaymentMethod; // online abhi single-payment hi rahega bas cod
 }
 
 interface PreviewOrderInput {
@@ -242,6 +249,20 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
     const totalTax = itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0);
     const total = subtotal - discount + totalTax;
 
+    // ---- NAYA: payments validation ----
+    // Sabhi payment entries ka sum order ke total ke EXACTLY barabar hona chahiye.
+    // Paise (2 decimal) tak precision ke liye *100 karke integer compare kiya —
+    // floating point drift (0.1 + 0.2 !== 0.3 jaisi dikkat) se bachne ka standard tareeka.
+    const paymentsTotal = data.payments.reduce((sum, p) => sum + p.amount, 0);
+
+    if (Math.round(paymentsTotal * 100) !== Math.round(total * 100)) {
+      const err: any = new Error(
+        `Payment amount (${paymentsTotal}) does not match order total (${total})`,
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
     const orderNumber = await generateOrderNumber(tx);
 
     return tx.order.create({
@@ -267,17 +288,25 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
             taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
           })),
         },
-        payment: {
-          create: { method: data.paymentMethod, status: "PAID", amount: total },
+        // NAYA: single "payment: { create: {...} }" ki jagah ab
+        // "payments: { create: [...] }" — ek order ke multiple Payment records ban sakte hain.
+        // Har entry PAID status ke saath directly create hoti hai (POS = turant settle hota hai).
+        payments: {
+          create: data.payments.map((p) => ({
+            method: p.method,
+            status: "PAID",
+            amount: p.amount,
+            transactionRef: p.transactionRef,
+          })),
         },
       },
-      include: { orderItems: true, payment: true },
+      // "payment: true" (singular) ki jagah "payments: true" (array) — Prisma relation change ki wajah se
+      include: { orderItems: true, payments: true },
     });
   });
 }
 
 // ==================== ONLINE ORDER ====================
-
 export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
   if (data.paymentMethod !== "COD") {
     throw new Error("Only COD payment is supported at the moment");
@@ -348,11 +377,14 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
             taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
           })),
         },
-        payment: {
-          create: { method: "COD", status: "PENDING", amount: total },
+        // FIX: "payment: { create: {...} }" (singular object) ki jagah
+        // ab "payments: { create: [ {...} ] }" — array ke andar ek hi entry (COD)
+        payments: {
+          create: [{ method: "COD", status: "PENDING", amount: total }],
         },
       },
-      include: { orderItems: true, payment: true },
+      // FIX: include mein "payment" → "payments"
+      include: { orderItems: true, payments: true },
     });
 
     if (data.cartItemIds && data.cartItemIds.length > 0) {
@@ -474,7 +506,6 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
 }
 
 // ==================== READ / UPDATE / REFUND / CANCEL ====================
-
 export async function getAllOrdersService(filters: { customerId?: string }) {
   const orders = await prisma.order.findMany({
     where: filters.customerId ? { customerId: filters.customerId } : {},
@@ -485,7 +516,7 @@ export async function getAllOrdersService(filters: { customerId?: string }) {
           variant: { select: { id: true, name: true, images: true } },
         },
       },
-      payment: true,
+      payments: true, // FIX: "payment" → "payments"
       customer: { select: { id: true, name: true, phone: true, email: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -518,7 +549,7 @@ export async function getOrderByIdService(id: string) {
           variant: { select: { id: true, name: true, images: true } },
         },
       },
-      payment: true,
+      payments: true, // FIX: "payment" → "payments"
       customer: { select: { id: true, name: true, phone: true, email: true } },
       address: true,
       refunds: true,
@@ -554,8 +585,6 @@ export async function updateOrderStatusService(id: string, status: string) {
     throw error;
   }
 
-  // "as any" pehle silently invalid string bhi accept kar leta tha —
-  // ab enum se validate karo taaki DB mein galat status na jaye
   if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
     const error: any = new Error(`Invalid order status: ${status}`);
     error.statusCode = 400;
@@ -564,9 +593,6 @@ export async function updateOrderStatusService(id: string, status: string) {
 
   const data: any = { status: status as OrderStatus };
 
-  // COMPLETED pe hi deliveredAt set karo — aur sirf tab jab pehle se set nahi hai,
-  // warna baar-baar status COMPLETED → PROCESSING → COMPLETED toggle hone pe
-  // deliveredAt reset ho jayega aur return window customer ke against unfair reset ho jayegi
   if (status === OrderStatus.COMPLETED && !order.deliveredAt) {
     data.deliveredAt = new Date();
   }
@@ -586,7 +612,7 @@ export async function refundOrderService(
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id },
-      include: { orderItems: true, payment: true },
+      include: { orderItems: true, payments: true }, // FIX: "payment" → "payments"
     });
 
     if (!order) {
@@ -600,9 +626,12 @@ export async function refundOrderService(
 
     await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
 
-    if (order.payment) {
-      await tx.payment.update({
-        where: { id: order.payment.id },
+    // FIX: pehle sirf ek "order.payment" tha, ab "order.payments" array hai
+    // (split payment ki wajah se ek order ke multiple Payment records ho sakte hain) —
+    // isliye updateMany se orderId ke sabhi payments ko ek saath REFUNDED mark kar rahe hain
+    if (order.payments.length > 0) {
+      await tx.payment.updateMany({
+        where: { orderId: id },
         data: { status: "REFUNDED" },
       });
     }
@@ -627,7 +656,7 @@ export async function cancelOrderService(
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id },
-      include: { orderItems: true, payment: true },
+      include: { orderItems: true, payments: true }, // FIX: "payment" → "payments"
     });
 
     if (!order || order.customerId !== customerId) {
@@ -648,9 +677,10 @@ export async function cancelOrderService(
 
     await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
 
-    if (order.payment) {
-      await tx.payment.update({
-        where: { id: order.payment.id },
+    // FIX: yahan bhi sabhi payments ko FAILED mark karo (split payment case)
+    if (order.payments.length > 0) {
+      await tx.payment.updateMany({
+        where: { orderId: id },
         data: { status: "FAILED" },
       });
     }

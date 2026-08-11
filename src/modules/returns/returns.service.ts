@@ -314,16 +314,18 @@ export async function processExchange(id: string, adminId: string) {
               subtotal,
             },
           },
-          payment: {
-            create: {
-              method: PaymentMethod.COD,
-              status: totalPriceDiff > 0 ? PaymentStatus.PENDING : PaymentStatus.PAID,
-              amount: totalPriceDiff > 0 ? totalPriceDiff : 0,
-            },
+          // FIX: "payment: { create: {...} }" → "payments: { create: [{...}] }"
+          payments: {
+            create: [
+              {
+                method: PaymentMethod.COD,
+                status: totalPriceDiff > 0 ? PaymentStatus.PENDING : PaymentStatus.PAID,
+                amount: totalPriceDiff > 0 ? totalPriceDiff : 0,
+              },
+            ],
           },
         },
       });
-
       await tx.returnRequest.update({
         where: { id },
         data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id, approvedById: adminId },
@@ -333,7 +335,7 @@ export async function processExchange(id: string, adminId: string) {
     });
   }
 
-  // ===== CASE 2: Simple product replacement (same product, defect exchange) =====
+// ===== CASE 2: Simple product replacement (same product, defect exchange) =====
   if (orderItem.product.stock < existing.quantity) {
     const error: any = new Error("Replacement stock not available for this product");
     error.statusCode = 400;
@@ -367,12 +369,14 @@ export async function processExchange(id: string, adminId: string) {
             subtotal,
           },
         },
-        payment: {
-          create: {
-            method: PaymentMethod.COD,
-            status: PaymentStatus.PAID, // same price hai, price-diff ka sawaal nahi
-            amount: 0,
-          },
+        payments: {
+          create: [
+            {
+              method: PaymentMethod.COD,
+              status: PaymentStatus.PAID, // same price hai, price-diff ka sawaal nahi
+              amount: 0,
+            },
+          ],
         },
       },
     });

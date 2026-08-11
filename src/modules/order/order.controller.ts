@@ -4,30 +4,40 @@ import { hasPermission } from "../../middlewares/permission.middleware.js";
 
 export async function createPosOrder(req: Request, res: Response) {
   try {
-    const { items, customerId, couponCode, paymentMethod } = req.body;
+    const { items, customerId, couponCode, payments } = req.body;
 
-    if (
-      !items ||
-      !Array.isArray(items) ||
-      items.length === 0 ||
-      !paymentMethod
-    ) {
+    // items check — pehle jaisa hi
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "items are required" });
+    }
+
+    // paymentMethod (single) ki jagah ab payments (array) required hai
+    if (!payments || !Array.isArray(payments) || payments.length === 0) {
       return res
         .status(400)
-        .json({ message: "items and paymentMethod are required" });
+        .json({ message: "payments array is required (at least one entry)" });
+    }
+
+    // har payment entry ke andar method + amount dono hone chahiye
+    for (const p of payments) {
+      if (!p.method || typeof p.amount !== "number" || p.amount <= 0) {
+        return res.status(400).json({
+          message: "each payment must have a valid method and a positive amount",
+        });
+      }
     }
 
     const order = await orderService.createPosOrderService({
       items,
       customerId,
       couponCode,
-      paymentMethod,
+      payments,
       createdById: req.user!.id,
     });
 
     return res.status(201).json({ message: "Order created", data: order });
   } catch (error: any) {
-    return res.status(400).json({ message: error.message });
+    return res.status(error.statusCode || 400).json({ message: error.message });
   }
 }
 
