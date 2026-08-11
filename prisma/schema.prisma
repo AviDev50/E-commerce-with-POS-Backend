@@ -273,7 +273,7 @@ model Order {
   deliveredAt DateTime?
 
   orderItems  OrderItem[]
-  payment     Payment?
+  payments    Payment[]
   refunds     Refund[]
   exchangeReturnRequests ReturnRequest[] @relation("ExchangeOrder")
 
@@ -301,7 +301,7 @@ model OrderItem {
 
 model Payment {
   id             String        @id @default(uuid())
-  orderId        String        @unique
+  orderId        String        
   order          Order         @relation(fields: [orderId], references: [id])
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
