@@ -110,9 +110,9 @@ model Customer {
   phone         String         @unique
   email         String? 
   cart          Cart?          
-  password      String
-  dob           DateTime       @db.Date
-  gender        Gender
+  password      String?
+  dob           DateTime?       @db.Date
+  gender        Gender?
   isActive      Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt

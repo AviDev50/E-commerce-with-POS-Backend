@@ -63,6 +63,10 @@ export async function loginCustomerService(data: LoginInput) {
     throw new Error("Invalid phone number or password");
   }
 
+    if (!customer.password) {
+    throw new Error("This account has no password set. Please complete registration first.");
+  }
+
   const isPasswordValid = await bcrypt.compare(data.password, customer.password);
   if (!isPasswordValid) {
     throw new Error("Invalid phone number or password");
