@@ -123,6 +123,7 @@ model Customer {
   refreshTokens RefreshToken[]
    wishlistItems WishlistItem[]
    returnRequests ReturnRequest[]
+    supportTickets SupportTicket[]
 
   @@map("customers")
 }
@@ -527,4 +528,24 @@ model ReturnRequest {
   updatedAt   DateTime @updatedAt
 
   @@map("return_requests")
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id          String              @id @default(uuid())
+  customerId  String
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  title       String
+  description String
+  status      SupportTicketStatus @default(OPEN)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("support_tickets")
 }
