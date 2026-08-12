@@ -51,6 +51,8 @@ const permissions = [
   { key: "staff:manage", description: "to manage staff" },
   { key: "support:read", description: "View support tickets" },
   { key: "support:update", description: "Update support ticket status" },
+  { key: "page:read", description: "View static pages content" },
+  { key: "page:update", description: "Update static pages (About, T&C, Privacy, Return Policy)" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -97,6 +99,8 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "staff:manage": [Role.ADMIN],
   "support:read": [Role.ADMIN, Role.MANAGER],
   "support:update": [Role.ADMIN, Role.MANAGER],
+  "page:read": [Role.ADMIN],
+  "page:update": [Role.ADMIN],
 };
 
 async function seedBootstrapAdmin() {

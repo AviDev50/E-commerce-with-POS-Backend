@@ -31,6 +31,8 @@ import customerManagementRoutes from "./modules/customerManagement/customerManag
 import staffManagementRoutes from "./modules/staffManagement/staff.routes.js"
 import supportRoutes from "./modules/support/support.routes.js";
 import websiteSupportRoutes from "./modules/websiteSupport/websiteSupport.routes.js";
+import pageRoutes from "./modules/page/page.routes.js";
+import websitePageRoutes from "./modules/websitePage/websitePage.routes.js";
 
 
 // __dirname replacement for ESM
@@ -80,8 +82,10 @@ app.use("/api/v1/returns", returnsRoutes)
 app.use("/api/v1/dashboard", dashboardRoutes)
 app.use("/api/v1/pos/customers", customerManagementRoutes)
 app.use("/api/v1/pos/staff", staffManagementRoutes)
-app.use("/api/support", supportRoutes);             
-app.use("/api/website/support", websiteSupportRoutes); 
+app.use("/api/v1/support", supportRoutes);             
+app.use("/api/v1/website/support", websiteSupportRoutes); 
+app.use("/api/v1/pages", pageRoutes);              
+app.use("/api/v1/website/pages", websitePageRoutes); 
 
 // Start Server
 app.listen(PORT, () => {

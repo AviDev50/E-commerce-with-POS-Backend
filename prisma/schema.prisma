@@ -549,3 +549,20 @@ model SupportTicket {
 
   @@map("support_tickets")
 }
+
+enum PageType {
+  ABOUT_US
+  TERMS_AND_CONDITIONS
+  PRIVACY_POLICY
+  RETURN_AND_REFUND_POLICY
+}
+
+model StorePage {
+  id        String   @id @default(uuid())
+  type      PageType @unique
+  title     String
+  content   String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("store_pages")
+}
