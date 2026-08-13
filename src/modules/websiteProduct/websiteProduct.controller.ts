@@ -84,3 +84,15 @@ export async function getTopRated(req: Request, res: Response) {
     return res.status(500).json({ message: error.message });
   }
 }
+
+export async function getRecommendedProducts(req: Request, res: Response) {
+  try {
+    const customerId = req.customer?.id || null; // ⬅️ ab bina cast ke, jaisa aapka type augmentation hai
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+
+    const products = await websiteProductService.getRecommendedProductsService(customerId, limit);
+    return res.status(200).json({ data: products });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message });
+  }
+}
