@@ -443,3 +443,108 @@ export async function getTopRatedService(limit: number = 10, minReviews: number 
   const productIds = grouped.map((g) => g.productId);
   return getProductCardsByIds(productIds); // rating-desc order already preserved
 }
+
+export async function getRecommendedProductsService(customerId: string | null, limit: number = 10) {
+  // Guest ya bina history wale customer ke liye — bestseller fallback (cold-start problem ka standard solution)
+  if (!customerId) {
+    return getBestsellersService(limit);
+  }
+
+  // Step 1: Purchase history se categories nikaalo (sirf COMPLETED orders)
+  const orderItems = await prisma.orderItem.findMany({
+    where: { order: { customerId, status: "COMPLETED" } },
+    select: { productId: true, product: { select: { categoryId: true } } },
+  });
+
+  // Step 2: Agar order history nahi hai, wishlist se try karo
+  const wishlistItems =
+    orderItems.length === 0
+      ? await prisma.wishlistItem.findMany({
+          where: { customerId },
+          select: { productId: true, product: { select: { categoryId: true } } },
+        })
+      : [];
+
+  const sourceItems = orderItems.length > 0 ? orderItems : wishlistItems;
+
+  // Koi history hi nahi (naya customer) — bestseller fallback
+  if (sourceItems.length === 0) {
+    return getBestsellersService(limit);
+  }
+
+  // Category frequency count karo, top 3 categories nikaalo
+  const categoryFreq = new Map<string, number>();
+  const excludeProductIds = new Set<string>();
+
+  for (const item of sourceItems) {
+    excludeProductIds.add(item.productId); // jo already khareeda/wishlist kiya, dobara suggest mat karo
+    const catId = item.product.categoryId;
+    if (catId) categoryFreq.set(catId, (categoryFreq.get(catId) || 0) + 1);
+  }
+
+  const topCategoryIds = [...categoryFreq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([catId]) => catId);
+
+  if (topCategoryIds.length === 0) {
+    return getBestsellersService(limit);
+  }
+
+  const products = await prisma.product.findMany({
+    where: {
+      categoryId: { in: topCategoryIds },
+      isActive: true,
+      id: { notIn: [...excludeProductIds] },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      images: true,
+      price: true,
+      stock: true,
+      createdAt: true,
+      category: { select: { id: true, name: true, slug: true } },
+      variants: { select: { price: true, stock: true } },
+      reviews: { where: { isApproved: true }, select: { rating: true } },
+    },
+    take: limit,
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Category mein aur naye products nahi bache — bestseller fallback
+  if (products.length === 0) {
+    return getBestsellersService(limit);
+  }
+
+  return products.map((p) => {
+    const hasVariants = p.variants.length > 0;
+    const displayPrice = hasVariants
+      ? Math.min(...p.variants.map((v) => Number(v.price)))
+      : Number(p.price);
+    const inStock = hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+    const reviewCount = p.reviews.length;
+    const avgRating =
+      reviewCount > 0
+        ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
+        : 0;
+
+    const imgs = parseImages(p.images);
+    const image = imgs.length > 0 ? formatImageUrl(imgs[0]) : null;
+
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      image,
+      displayPrice,
+      hasVariants,
+      inStock,
+      avgRating,
+      reviewCount,
+      createdAt: p.createdAt,
+      category: p.category,
+    };
+  });
+}
