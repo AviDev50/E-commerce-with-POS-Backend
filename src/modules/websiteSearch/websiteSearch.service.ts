@@ -14,7 +14,10 @@ function parseImages(images: any): string[] {
   return [];
 }
 
-export async function getSearchSuggestionsService(query: string, limit: number = 8) {
+export async function getSearchSuggestionsService(
+  query: string,
+  limit: number = 8,
+) {
   if (!query?.trim() || query.trim().length < 2) {
     // 1-character search bahut zyada noise/results dega, kam se kam 2 characters chahiye
     return { products: [], categories: [] };

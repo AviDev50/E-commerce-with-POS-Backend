@@ -52,7 +52,11 @@ const permissions = [
   { key: "support:read", description: "View support tickets" },
   { key: "support:update", description: "Update support ticket status" },
   { key: "page:read", description: "View static pages content" },
-  { key: "page:update", description: "Update static pages (About, T&C, Privacy, Return Policy)" },
+  {
+    key: "page:update",
+    description: "Update static pages (About, T&C, Privacy, Return Policy)",
+  },
+  { key: "product:view:pos", description: "to view pos products" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -101,6 +105,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "support:update": [Role.ADMIN, Role.MANAGER],
   "page:read": [Role.ADMIN],
   "page:update": [Role.ADMIN],
+  "product:view:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
 
 async function seedBootstrapAdmin() {

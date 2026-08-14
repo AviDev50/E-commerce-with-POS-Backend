@@ -523,3 +523,97 @@ export async function generateVariantsService(
 
   return createdVariants;
 }
+
+// ==================== POS BILLING SEARCH ====================
+// Cashier/Admin dono POS Panel pe isse use karenge billing counter pe.
+// costPrice yahan kabhi select nahi hota — Cashier ko margin/cost dikhna nahi chahiye.
+
+interface PosProductSearchQuery {
+  search?: string; // name YA sku dono pe match karega
+  page?: number;
+  limit?: number;
+}
+
+export async function getProductsForPosService(query: PosProductSearchQuery) {
+  const page = query.page && query.page > 0 ? query.page : 1;
+  const limit = query.limit && query.limit > 0 ? query.limit : 20;
+
+  const where: Prisma.ProductWhereInput = { isActive: true };
+
+  // name OR sku dono pe search — cashier chahe naam type kare ya SKU
+  if (query.search) {
+    where.OR = [
+      { name: { contains: query.search } },
+      { sku: { contains: query.search } },
+    ];
+  }
+
+  // costPrice explicitly select nahi kiya — safe by construction, filter se nahi, design se
+  const products = await prisma.product.findMany({
+    where,
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      price: true,
+      stock: true,
+      images: true,
+      variants: {
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          price: true,
+          stock: true,
+          images: true,
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  // in-memory: hasVariants + inStock resolve karo (websiteProduct module jaisa hi pattern)
+  const withStockInfo = products.map((p) => {
+    const hasVariants = p.variants.length > 0;
+    const inStock = hasVariants
+      ? p.variants.some((v) => v.stock > 0)
+      : p.stock > 0;
+
+    const imgs: string[] = p.images ? JSON.parse(p.images) : [];
+
+    return {
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      price: Number(p.price),
+      stock: p.stock,
+      image: imgs.length > 0 ? formatImageUrl(imgs[0]) : null,
+      hasVariants,
+      inStock,
+      variants: p.variants.map((v) => {
+        const vImgs: string[] = v.images ? JSON.parse(v.images) : [];
+        return {
+          id: v.id,
+          name: v.name,
+          sku: v.sku,
+          price: Number(v.price),
+          stock: v.stock,
+          inStock: v.stock > 0,
+          image: vImgs.length > 0 ? formatImageUrl(vImgs[0]) : null,
+        };
+      }),
+    };
+  });
+
+  // out-of-stock products billing list se hata do — cashier ko select karne ka mauka hi na mile
+  const inStockOnly = withStockInfo.filter((p) => p.inStock);
+
+  const total = inStockOnly.length;
+  const start = (page - 1) * limit;
+  const paginated = inStockOnly.slice(start, start + limit);
+
+  return {
+    products: paginated,
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}
