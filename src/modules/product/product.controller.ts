@@ -209,3 +209,19 @@ export async function updateVariant(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function getProductsForPos(req: Request, res: Response) {
+  try {
+    const { search, page, limit } = req.query;
+
+    const result = await productService.getProductsForPosService({
+      search: search as string | undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    return res.status(200).json({ data: result.products, pagination: result.pagination });
+  } catch (error: any) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}

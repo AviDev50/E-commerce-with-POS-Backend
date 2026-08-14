@@ -25,16 +25,15 @@ import wishlistRoutes from "./modules/wishlist/wishlist.routes.js";
 import taxRoutes from "./modules/tax/tax.routes.js";
 import customerProfileRoutes from "./modules/customerProfile/customerProfile.routes.js";
 import returnsRoutes from "./modules/returns/returns.routes.js";
-import websiteReturnsRoutes from "./modules/websiteReturns/websiteReturns.routes.js"
-import dashboardRoutes from "./modules/dashboard/dashboard.routes.js"
-import customerManagementRoutes from "./modules/customerManagement/customerManagement.routes.js"
-import staffManagementRoutes from "./modules/staffManagement/staff.routes.js"
+import websiteReturnsRoutes from "./modules/websiteReturns/websiteReturns.routes.js";
+import dashboardRoutes from "./modules/dashboard/dashboard.routes.js";
+import customerManagementRoutes from "./modules/customerManagement/customerManagement.routes.js";
+import staffManagementRoutes from "./modules/staffManagement/staff.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
 import websiteSupportRoutes from "./modules/websiteSupport/websiteSupport.routes.js";
 import pageRoutes from "./modules/page/page.routes.js";
 import websitePageRoutes from "./modules/websitePage/websitePage.routes.js";
 import websiteSearchRoutes from "./modules/websiteSearch/websiteSearch.routes.js";
-
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -59,7 +58,7 @@ app.get("/health", (_req: Request, res: Response) => {
   });
 });
 
-// Routes
+//admin panel website routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/attributes", attributeRoutes);
 app.use("/api/v1/products", productRoutes);
@@ -71,25 +70,29 @@ app.use("/api/v1/permissions", permissionRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/customer", customerRoutes);
+app.use("/api/v1/banners", bannerRoutes);
+app.use("/api/v1/tax", taxRoutes);
+app.use("/api/v1/customer/profile", customerProfileRoutes);
+app.use("/api/v1/support", supportRoutes);
+app.use("/api/v1/returns", returnsRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/pages", pageRoutes);
+
+//E-Commerce website Routes
 app.use("/api/v1/website/cart", cartRoutes);
-app.use("/api/v1/banners", bannerRoutes);              
 app.use("/api/v1/website/banners", websiteBannerRoutes);
 app.use("/api/v1/websiteProducts", websiteProductRoutes);
 app.use("/api/v1/website/wishlist", wishlistRoutes);
-app.use("/api/v1/tax", taxRoutes);
-app.use("/api/v1/customer/profile", customerProfileRoutes);
-app.use("/api/v1/website/returns", websiteReturnsRoutes)
-app.use("/api/v1/returns", returnsRoutes)
-app.use("/api/v1/dashboard", dashboardRoutes)
-app.use("/api/v1/pos/customers", customerManagementRoutes)
-app.use("/api/v1/pos/staff", staffManagementRoutes)
-app.use("/api/v1/support", supportRoutes);             
-app.use("/api/v1/website/support", websiteSupportRoutes); 
-app.use("/api/v1/pages", pageRoutes);              
+app.use("/api/v1/website/returns", websiteReturnsRoutes);
+app.use("/api/v1/website/support", websiteSupportRoutes);
 app.use("/api/v1/website/pages", websitePageRoutes);
-app.use("/api/v1/website/search", websiteSearchRoutes); 
+app.use("/api/v1/website/search", websiteSearchRoutes);
+
+//pos panel website routes
+app.use("/api/v1/pos/customers", customerManagementRoutes);
+app.use("/api/v1/pos/staff", staffManagementRoutes);
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
