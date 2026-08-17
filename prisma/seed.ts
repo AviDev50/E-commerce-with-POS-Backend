@@ -57,6 +57,10 @@ const permissions = [
     description: "Update static pages (About, T&C, Privacy, Return Policy)",
   },
   { key: "product:view:pos", description: "to view pos products" },
+  { key: "report:sales:view", description: "to view reports of a products" },
+   { key: "shift:manage", description: "to view reports of a products" },
+   { key: "shift:view:all", description: "to view shift of all employee" },
+   { key: "order:hold", description: "to create other orders when any customer is busy" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -106,6 +110,10 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "page:read": [Role.ADMIN],
   "page:update": [Role.ADMIN],
   "product:view:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "report:sales:view": [Role.ADMIN],
+  "shift:manage": [Role.ADMIN],
+  "shift:view:all": [Role.ADMIN],
+  "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
 
 async function seedBootstrapAdmin() {

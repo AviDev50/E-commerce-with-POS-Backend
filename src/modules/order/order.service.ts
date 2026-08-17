@@ -85,6 +85,19 @@ async function resolveOrderItems(
       }
       price = Number(variant.price);
     } else {
+      // NAYA: agar variantId nahi diya, check karo ki is product ke variants exist toh nahi karte.
+      // Agar karte hain, to base product select karna galat hai — cashier ko specific
+      // variant (Size/Color) choose karna zaroori hai, warna galat price/stock use ho jayega.
+      const variantCount = await tx.productVariant.count({
+        where: { productId: item.productId },
+      });
+      if (variantCount > 0) {
+        const err: any = new Error(
+          `Please select a variant for: ${product.name}`,
+        );
+        err.statusCode = 400;
+        throw err;
+      }
       price = Number(product.price);
     }
 
@@ -216,6 +229,16 @@ async function buildItemsWithTax(
 
 export async function createPosOrderService(data: CreatePosOrderInput) {
   return prisma.$transaction(async (tx) => {
+     // NAYA: cashier ki active OPEN shift check karo — bina shift ke billing nahi hogi
+    const activeShift = await tx.shift.findFirst({
+      where: { cashierId: data.createdById, status: "OPEN" },
+    });
+
+    if (!activeShift) {
+      const err: any = new Error("Please open a shift before billing");
+      err.statusCode = 400;
+      throw err;
+    }
     const resolvedItems = await resolveOrderItems(tx, data.items);
     await deductStock(tx, resolvedItems);
 
@@ -272,6 +295,7 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         status: "COMPLETED",
         customerId: data.customerId,
         createdById: data.createdById,
+            shiftId: activeShift.id, // NAYA: order ko shift se link kiya
         couponId,
         subtotal,
         tax: totalTax,
@@ -694,4 +718,79 @@ export async function cancelOrderService(
       },
     });
   });
+}
+
+// ==================== RECEIPT (print-ready structured data) ====================
+// Ye function koi PDF/thermal-format nahi banata — sirf clean JSON deta hai.
+// Frontend (POS Panel) isko HTML template mein render karke window.print() karega,
+// ya future mein PDF-generation library se convert kar sakta hai.
+
+export async function getOrderReceiptService(id: string, requestingCustomerId?: string) {
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: {
+      orderItems: {
+        include: {
+          product: { select: { name: true, sku: true } },
+          variant: { select: { name: true, sku: true } },
+        },
+      },
+      payments: true,
+      customer: { select: { name: true, phone: true } },
+      createdBy: { select: { name: true } },
+    },
+  });
+
+  if (!order) {
+    const err: any = new Error("Order not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // customer khud call kar raha hai to check karo ye uska hi order hai
+  if (requestingCustomerId !== undefined && order.customerId !== requestingCustomerId) {
+    const err: any = new Error("You do not have access to this order");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const storeSettings = await prisma.storeSettings.findFirst();
+
+  return {
+    store: {
+      businessName: storeSettings?.businessName ?? "",
+      address: storeSettings?.address ?? "",
+      phone: storeSettings?.phone ?? "",
+      email: storeSettings?.email ?? "",
+    },
+    order: {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      channel: order.channel,
+      createdAt: order.createdAt,
+      cashierName: order.createdBy?.name ?? null,
+    },
+    customer: order.customer
+      ? { name: order.customer.name, phone: order.customer.phone }
+      : null,
+    items: order.orderItems.map((item) => ({
+      productName: item.variant?.name
+        ? `${item.product.name} - ${item.variant.name}`
+        : item.product.name,
+      sku: item.variant?.sku ?? item.product.sku,
+      quantity: item.quantity,
+      price: Number(item.price),
+      taxAmount: Number(item.taxAmount),
+      subtotal: Number(item.subtotal),
+      lineTotal: Number(item.subtotal) + Number(item.taxAmount),
+    })),
+    payments: order.payments.map((p) => ({
+      method: p.method,
+      amount: Number(p.amount),
+    })),
+    subtotal: Number(order.subtotal),
+    discount: Number(order.discount),
+    tax: Number(order.tax),
+    total: Number(order.total),
+  };
 }
