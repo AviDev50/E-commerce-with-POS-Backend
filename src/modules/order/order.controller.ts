@@ -181,3 +181,14 @@ export async function cancelOrder(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function getOrderReceipt(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const requestingCustomerId = req.customer ? req.customer.id : undefined;
+    const receipt = await orderService.getOrderReceiptService(id, requestingCustomerId);
+    return res.status(200).json({ data: receipt });
+  } catch (error: any) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}

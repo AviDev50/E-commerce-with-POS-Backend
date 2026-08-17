@@ -9,7 +9,11 @@ const router = Router();
 
 // Online — customer only
 router.post("/online", verifyCustomerToken, orderController.createOnlineOrder);
-router.post("/preview", verifyCustomerToken, orderController.previewOnlineOrder);
+router.post(
+  "/preview",
+  verifyCustomerToken,
+  orderController.previewOnlineOrder,
+);
 router.post("/:id/cancel", verifyCustomerToken, orderController.cancelOrder);
 
 // POS — staff only
@@ -19,6 +23,8 @@ router.post(
   checkPermission("order:create:pos"),
   orderController.createPosOrder,
 );
+
+router.get("/:id/receipt", verifyAnyToken, orderController.getOrderReceipt);
 
 // Shared — staff ya customer dono access kar sakte hain (controller ke andar filter/authorize hota hai)
 router.get("/", verifyAnyToken, orderController.getAllOrders);
@@ -38,7 +44,5 @@ router.post(
   checkPermission("order:refund"),
   orderController.refundOrder,
 );
-
-
 
 export default router;

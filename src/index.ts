@@ -34,6 +34,9 @@ import websiteSupportRoutes from "./modules/websiteSupport/websiteSupport.routes
 import pageRoutes from "./modules/page/page.routes.js";
 import websitePageRoutes from "./modules/websitePage/websitePage.routes.js";
 import websiteSearchRoutes from "./modules/websiteSearch/websiteSearch.routes.js";
+import reportsRoutes from "./modules/reports/reports.routes.js";
+import shiftRoutes from "./modules/shift/shift.routes.js"
+import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js"
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -91,6 +94,9 @@ app.use("/api/v1/website/search", websiteSearchRoutes);
 //pos panel website routes
 app.use("/api/v1/pos/customers", customerManagementRoutes);
 app.use("/api/v1/pos/staff", staffManagementRoutes);
+app.use("/api/v1/pos/reports", reportsRoutes);
+app.use("/api/v1/pos/shifts", shiftRoutes)
+app.use("/api/v1/pos/held-orders", heldOrderRoutes)
 
 // Start Server
 app.listen(PORT, () => {
