@@ -37,6 +37,7 @@ import websiteSearchRoutes from "./modules/websiteSearch/websiteSearch.routes.js
 import reportsRoutes from "./modules/reports/reports.routes.js";
 import shiftRoutes from "./modules/shift/shift.routes.js"
 import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js"
+import razorpayRoutes from "./modules/razorpay/razorpay.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -47,7 +48,13 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf; // webhook controller isko use karega signature verify ke liye
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 
 // Static Files
@@ -90,6 +97,7 @@ app.use("/api/v1/website/returns", websiteReturnsRoutes);
 app.use("/api/v1/website/support", websiteSupportRoutes);
 app.use("/api/v1/website/pages", websitePageRoutes);
 app.use("/api/v1/website/search", websiteSearchRoutes);
+app.use("/api/v1/website/payments/razorpay", razorpayRoutes);
 
 //pos panel website routes
 app.use("/api/v1/pos/customers", customerManagementRoutes);
@@ -97,6 +105,7 @@ app.use("/api/v1/pos/staff", staffManagementRoutes);
 app.use("/api/v1/pos/reports", reportsRoutes);
 app.use("/api/v1/pos/shifts", shiftRoutes)
 app.use("/api/v1/pos/held-orders", heldOrderRoutes)
+
 
 // Start Server
 app.listen(PORT, () => {

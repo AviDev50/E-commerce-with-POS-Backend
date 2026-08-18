@@ -185,3 +185,24 @@ export async function clearCartService(customerId: string) {
 
   return buildCartResponse(cart.id);
 }
+
+// Razorpay flow ke liye — Cart se items nikaal ke OrderItemInput shape mein convert karna
+export async function getCartAsOrderItemsService(customerId: string) {
+  const cart = await prisma.cart.findUnique({
+    where: { customerId },
+    include: { items: true },
+  });
+
+  if (!cart || cart.items.length === 0) {
+    throw new Error("Your cart is empty");
+  }
+
+  return {
+    items: cart.items.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId || undefined,
+      quantity: item.quantity,
+    })),
+    cartItemIds: cart.items.map((item) => item.id),
+  };
+}

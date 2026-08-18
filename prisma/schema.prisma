@@ -31,6 +31,7 @@ enum PaymentMethod {
   UPI
   WALLET
   COD
+  NETBANKING    // ONLINE hata diya — channel field already yeh role nibhata hai
 }
 
 enum PaymentStatus {
@@ -282,6 +283,7 @@ model Order {
   refunds     Refund[]
   exchangeReturnRequests ReturnRequest[] @relation("ExchangeOrder")
     shift       Shift?   @relation(fields: [shiftId], references: [id])
+    gatewayOrderId String? @unique   // Razorpay ka razorpay_order_id — idempotency ke liye
 
   @@map("orders")
 }
