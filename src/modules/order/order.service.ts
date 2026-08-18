@@ -1,5 +1,5 @@
 import prisma from "../../config/db.js";
-import { Prisma, PaymentMethod } from "@prisma/client";
+import { Prisma, PaymentMethod, PaymentStatus } from "@prisma/client";
 import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { computeCouponDiscount } from "../../utils/couponValidator.js";
@@ -189,6 +189,125 @@ async function applyCoupon(
   return { couponId: coupon.id, discount };
 }
 
+// ==================== SHARED: Confirmed Order Creation (COD + Razorpay dono use karenge) ====================
+
+interface ConfirmedOrderPaymentInput {
+  method: PaymentMethod;
+  status: PaymentStatus;
+  transactionRef?: string;
+}
+
+interface CreateConfirmedOrderInput {
+  customerId: string;
+  addressId: string;
+  couponCode?: string;
+  items: OrderItemInput[];
+  payment: ConfirmedOrderPaymentInput; // ONLINE channel mein hamesha single payment hota hai (split sirf POS mein hai)
+  status: "PENDING"; // order lifecycle status — payment status se independent (fulfillment abhi baaki hai chahe paisa mil chuka ho)
+  gatewayOrderId?: string; // Razorpay ke liye — idempotency ke liye
+  cartItemIds?: string[];
+}
+
+export async function createConfirmedOrderService(input: CreateConfirmedOrderInput) {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const address = await tx.address.findUnique({ where: { id: input.addressId } });
+      if (!address || address.customerId !== input.customerId) {
+        throw new Error("Address not found");
+      }
+
+      const storeSettings = await tx.storeSettings.findFirst();
+      const storeCountry = storeSettings?.country ?? null;
+      const storeState = storeSettings?.state ?? null;
+
+      const resolvedItems = await resolveOrderItems(tx, input.items);
+      await deductStock(tx, resolvedItems); // yahi step Razorpay mein PAYMENT SUCCESS ke baad hoga (COD mein order-create ke saath)
+
+      const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+      let discount = 0;
+      let couponId: string | undefined;
+      if (input.couponCode) {
+        const couponResult = await applyCoupon(tx, input.couponCode, subtotal);
+        discount = couponResult.discount;
+        couponId = couponResult.couponId;
+      }
+
+      const itemsWithTax = await buildItemsWithTax(
+        tx,
+        resolvedItems,
+        address.country,
+        address.state,
+        storeCountry,
+        storeState,
+      );
+
+      const totalTax = itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0);
+      const total = subtotal - discount + totalTax; // yahi authoritative total hai — payment amount ISSE derive hoga, kisi bhi upstream estimate se nahi
+
+      const orderNumber = await generateOrderNumber(tx);
+
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          channel: "ONLINE",
+          status: input.status,
+          customerId: input.customerId,
+          addressId: input.addressId,
+          couponId,
+          gatewayOrderId: input.gatewayOrderId,
+          subtotal,
+          tax: totalTax,
+          discount,
+          total,
+          orderItems: {
+            create: itemsWithTax.map((i) => ({
+              productId: i.productId,
+              variantId: i.variantId,
+              quantity: i.quantity,
+              price: i.price,
+              subtotal: i.subtotal,
+              taxAmount: i.taxAmount,
+              taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+            })),
+          },
+          payments: {
+            create: [
+              {
+                method: input.payment.method,
+                status: input.payment.status,
+                amount: total, // total hamesha yahin se compute hoga, caller se nahi liya — mismatch impossible
+                transactionRef: input.payment.transactionRef,
+              },
+            ],
+          },
+        },
+        include: { orderItems: true, payments: true },
+      });
+
+      if (input.cartItemIds && input.cartItemIds.length > 0) {
+        await tx.cartItem.deleteMany({
+          where: { id: { in: input.cartItemIds }, cart: { customerId: input.customerId } },
+        });
+      }
+
+      return order;
+    });
+  } catch (err: any) {
+    // Razorpay ka verify (frontend) aur webhook (server-to-server) dono almost saath call ho sakte hain —
+    // agar dono transaction chala ke @@unique(gatewayOrderId) pe collide karein, jo pehle fail hua
+    // usko yeh existing order return kar dega, dobara stock deduct nahi hoga (transaction rollback ho chuka hoga)
+    if (input.gatewayOrderId && err.code === "P2002") {
+      const existing = await prisma.order.findUnique({
+        where: { gatewayOrderId: input.gatewayOrderId },
+        include: { orderItems: true, payments: true },
+      });
+      if (existing) return existing;
+    }
+    throw err;
+  }
+}
+
 async function buildItemsWithTax(
   tx: Prisma.TransactionClient,
   items: ResolvedItem[],
@@ -336,91 +455,14 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
     throw new Error("Only COD payment is supported at the moment");
   }
 
-  return prisma.$transaction(async (tx) => {
-    const address = await tx.address.findUnique({
-      where: { id: data.addressId },
-    });
-    if (!address || address.customerId !== data.customerId) {
-      throw new Error("Address not found");
-    }
-
-    const storeSettings = await tx.storeSettings.findFirst();
-    const storeCountry = storeSettings?.country ?? null;
-    const storeState = storeSettings?.state ?? null;
-
-    const resolvedItems = await resolveOrderItems(tx, data.items);
-    await deductStock(tx, resolvedItems);
-
-    const subtotal = resolvedItems.reduce(
-      (sum, i) => sum + i.price * i.quantity,
-      0,
-    );
-
-    let discount = 0;
-    let couponId: string | undefined;
-    if (data.couponCode) {
-      const couponResult = await applyCoupon(tx, data.couponCode, subtotal);
-      discount = couponResult.discount;
-      couponId = couponResult.couponId;
-    }
-
-    const itemsWithTax = await buildItemsWithTax(
-      tx,
-      resolvedItems,
-      address.country,
-      address.state,
-      storeCountry,
-      storeState,
-    );
-
-    const totalTax = itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0);
-    const total = subtotal - discount + totalTax;
-
-    const orderNumber = await generateOrderNumber(tx);
-
-    const order = await tx.order.create({
-      data: {
-        orderNumber,
-        channel: "ONLINE",
-        status: "PENDING",
-        customerId: data.customerId,
-        addressId: data.addressId,
-        couponId,
-        subtotal,
-        tax: totalTax,
-        discount,
-        total,
-        orderItems: {
-          create: itemsWithTax.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId,
-            quantity: i.quantity,
-            price: i.price,
-            subtotal: i.subtotal,
-            taxAmount: i.taxAmount,
-            taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
-          })),
-        },
-        // FIX: "payment: { create: {...} }" (singular object) ki jagah
-        // ab "payments: { create: [ {...} ] }" — array ke andar ek hi entry (COD)
-        payments: {
-          create: [{ method: "COD", status: "PENDING", amount: total }],
-        },
-      },
-      // FIX: include mein "payment" → "payments"
-      include: { orderItems: true, payments: true },
-    });
-
-    if (data.cartItemIds && data.cartItemIds.length > 0) {
-      await tx.cartItem.deleteMany({
-        where: {
-          id: { in: data.cartItemIds },
-          cart: { customerId: data.customerId },
-        },
-      });
-    }
-
-    return order;
+  return createConfirmedOrderService({
+    customerId: data.customerId,
+    addressId: data.addressId,
+    couponCode: data.couponCode,
+    items: data.items,
+    payment: { method: "COD", status: "PENDING" },
+    status: "PENDING",
+    cartItemIds: data.cartItemIds,
   });
 }
 

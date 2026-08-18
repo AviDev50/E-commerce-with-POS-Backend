@@ -35,6 +35,7 @@
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.5.3",
     "multer": "^2.2.0",
+    "razorpay": "^2.9.8",
     "redis": "^6.1.0",
     "sanitize-html": "^2.17.6"
   }
