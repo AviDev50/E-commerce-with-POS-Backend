@@ -4,8 +4,16 @@ import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.j
 
 const router = Router();
 
-router.post("/create-order", verifyCustomerToken, razorpayController.createRazorpayOrder);
-router.post("/verify", verifyCustomerToken, razorpayController.verifyRazorpayPayment);
+router.post(
+  "/create-order",
+  verifyCustomerToken,
+  razorpayController.createRazorpayOrder,
+);
+router.post(
+  "/verify",
+  verifyCustomerToken,
+  razorpayController.verifyRazorpayPayment,
+);
 router.post("/webhook", razorpayController.razorpayWebhook); // ⚠️ public — Razorpay khud call karega, koi customer token nahi hoga
 
 export default router;

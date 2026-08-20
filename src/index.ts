@@ -35,8 +35,8 @@ import pageRoutes from "./modules/page/page.routes.js";
 import websitePageRoutes from "./modules/websitePage/websitePage.routes.js";
 import websiteSearchRoutes from "./modules/websiteSearch/websiteSearch.routes.js";
 import reportsRoutes from "./modules/reports/reports.routes.js";
-import shiftRoutes from "./modules/shift/shift.routes.js"
-import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js"
+import shiftRoutes from "./modules/shift/shift.routes.js";
+import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js";
 import razorpayRoutes from "./modules/razorpay/razorpay.routes.js";
 
 // __dirname replacement for ESM
@@ -87,6 +87,7 @@ app.use("/api/v1/support", supportRoutes);
 app.use("/api/v1/returns", returnsRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/pages", pageRoutes);
+app.use("/api/v1/staff", staffManagementRoutes);
 
 //E-Commerce website Routes
 app.use("/api/v1/website/cart", cartRoutes);
@@ -101,11 +102,9 @@ app.use("/api/v1/website/payments/razorpay", razorpayRoutes);
 
 //pos panel website routes
 app.use("/api/v1/pos/customers", customerManagementRoutes);
-app.use("/api/v1/pos/staff", staffManagementRoutes);
 app.use("/api/v1/pos/reports", reportsRoutes);
-app.use("/api/v1/pos/shifts", shiftRoutes)
-app.use("/api/v1/pos/held-orders", heldOrderRoutes)
-
+app.use("/api/v1/pos/shifts", shiftRoutes);
+app.use("/api/v1/pos/held-orders", heldOrderRoutes);
 
 // Start Server
 app.listen(PORT, () => {

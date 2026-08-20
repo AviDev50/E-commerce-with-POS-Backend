@@ -16,7 +16,6 @@ router.get(
   productController.getProductsForPos,
 );
 
-
 // Public — customer bhi dekh sakta hai
 router.get("/", optionalAuth, productController.getAllProducts);
 router.get("/:id/variants", productController.getVariantsByProduct);
@@ -30,6 +29,7 @@ router.post(
   upload.array("images", 5),
   productController.createProduct,
 );
+
 router.put(
   "/:id",
   verifyToken,
@@ -37,6 +37,7 @@ router.put(
   upload.array("images", 5),
   productController.updateProduct,
 );
+
 router.delete(
   "/:id",
   verifyToken,

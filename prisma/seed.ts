@@ -110,8 +110,8 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "page:read": [Role.ADMIN],
   "page:update": [Role.ADMIN],
   "product:view:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
-  "report:sales:view": [Role.ADMIN],
-  "shift:manage": [Role.ADMIN],
+  "report:sales:view": [Role.ADMIN, Role.CASHIER],
+  "shift:manage": [Role.ADMIN, Role.CASHIER],
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
