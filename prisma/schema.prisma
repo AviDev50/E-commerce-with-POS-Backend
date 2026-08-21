@@ -177,6 +177,7 @@ model Product {
   description       String?
   sku               String    @unique
   price             Decimal   @db.Decimal(10, 2)
+  mrp               Decimal?  @db.Decimal(10, 2)
   costPrice         Decimal?  @db.Decimal(10, 2)
   taxClassId        String?
   taxClass          TaxClass? @relation(fields: [taxClassId], references: [id])
@@ -207,6 +208,7 @@ model ProductVariant {
   name       String
   sku        String   @unique
   price      Decimal  @db.Decimal(10, 2)
+  mrp        Decimal? @db.Decimal(10, 2)
   stock      Int      @default(0)
   images     String   @default("[]")
   createdAt  DateTime @default(now())

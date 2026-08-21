@@ -6,7 +6,7 @@ import * as productService from "./product.service.js";
 export async function createProduct(req: Request, res: Response) {
   try {
     const {
-      name, slug, description, sku, price, costPrice,
+      name, slug, description, sku, price, mrp, costPrice,
       taxClassId, categoryId, stock, lowStockThreshold,
       isReturnable, returnPolicyText,
     } = req.body;
@@ -21,6 +21,7 @@ export async function createProduct(req: Request, res: Response) {
     const product = await productService.createProductService({
       name, slug, description, sku,
       price: Number(price),
+      mrp: mrp ? Number(mrp) : undefined, 
       costPrice: costPrice ? Number(costPrice) : undefined,
       taxClassId, categoryId,
       stock: stock ? Number(stock) : undefined,
@@ -75,7 +76,7 @@ export async function updateProduct(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const {
-      name, slug, description, sku, price, costPrice,
+      name, slug, description, sku, price, mrp, costPrice,
       taxClassId, categoryId, stock, lowStockThreshold, isActive,
       isReturnable, returnPolicyText,
     } = req.body;
@@ -86,6 +87,7 @@ export async function updateProduct(req: Request, res: Response) {
     const product = await productService.updateProductService(id, {
       name, slug, description, sku,
       price: price ? Number(price) : undefined,
+      mrp: mrp ? Number(mrp) : undefined, 
       costPrice: costPrice ? Number(costPrice) : undefined,
       taxClassId, categoryId,
       stock: stock ? Number(stock) : undefined,
@@ -117,7 +119,7 @@ export async function deleteProduct(req: Request, res: Response) {
 export async function createVariant(req: Request, res: Response) {
   try {
     const productId = req.params.id as string;
-    const { name, sku, price, stock, attributes } = req.body;
+    const { name, sku, price, mrp, stock, attributes } = req.body;
 
     if (!name || !sku || !price || !attributes) {
       return res
@@ -129,6 +131,7 @@ export async function createVariant(req: Request, res: Response) {
       name,
       sku,
       price: Number(price),
+      mrp: mrp ? Number(mrp) : undefined,
       stock: stock ? Number(stock) : undefined,
       attributes,
     });
@@ -163,7 +166,7 @@ export async function deleteVariant(req: Request, res: Response) {
 export async function generateVariants(req: Request, res: Response) {
   try {
     const productId = req.params.id as string;
-    const { attributeGroups, basePrice, baseStock } = req.body;
+    const { attributeGroups, basePrice, baseMrp, baseStock } = req.body;
 
     if (!attributeGroups || !basePrice) {
       return res
@@ -174,6 +177,7 @@ export async function generateVariants(req: Request, res: Response) {
     const variants = await productService.generateVariantsService(productId, {
       attributeGroups,
       basePrice: Number(basePrice),
+      baseMrp: baseMrp ? Number(baseMrp) : undefined,
       baseStock: baseStock ? Number(baseStock) : undefined,
     });
 
@@ -189,7 +193,7 @@ export async function generateVariants(req: Request, res: Response) {
 export async function updateVariant(req: Request, res: Response) {
   try {
     const variantId = req.params.variantId as string;
-    const { name, price, stock } = req.body;
+    const { name, price, mrp, stock } = req.body;
 
     const files = (req.files as Express.Multer.File[]) || [];
     const images =
@@ -200,6 +204,7 @@ export async function updateVariant(req: Request, res: Response) {
     const variant = await productService.updateVariantService(variantId, {
       name,
       price: price ? Number(price) : undefined,
+      mrp: mrp ? Number(mrp) : undefined,
       stock: stock ? Number(stock) : undefined,
       images,
     });

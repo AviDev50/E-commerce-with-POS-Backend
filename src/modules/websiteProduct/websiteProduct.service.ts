@@ -17,6 +17,37 @@ function parseImages(images: any): string[] {
   return [];
 }
 
+function computeDiscount(price: number, mrp: any) {
+  const mrpNum = mrp ? Number(mrp) : null;
+  if (!mrpNum || mrpNum <= price) {
+    return { mrp: null, discountPercent: 0 };
+  }
+  return {
+    mrp: mrpNum,
+    discountPercent: Math.round(((mrpNum - price) / mrpNum) * 100),
+  };
+}
+
+// displayPrice = sabse sasta variant/product — USI ka mrp/discount lena hai, kisi random variant ka nahi
+function resolvePricing(
+  basePrice: number,
+  baseMrp: any,
+  variants: { price: any; mrp: any }[],
+) {
+  if (variants.length === 0) {
+    const { mrp, discountPercent } = computeDiscount(basePrice, baseMrp);
+    return { displayPrice: basePrice, mrp, discountPercent };
+  }
+
+  const cheapest = variants.reduce(
+    (min, v) => (Number(v.price) < Number(min.price) ? v : min),
+    variants[0],
+  );
+  const displayPrice = Number(cheapest.price);
+  const { mrp, discountPercent } = computeDiscount(displayPrice, cheapest.mrp);
+  return { displayPrice, mrp, discountPercent };
+}
+
 // Category + saare descendant category IDs nikalne ke liye (self-referential tree)
 async function getCategoryAndDescendantIds(slug: string): Promise<string[]> {
   const category = await prisma.category.findUnique({
@@ -48,6 +79,7 @@ export interface WebsiteProductQuery {
   search?: string;
   minPrice?: number;
   maxPrice?: number;
+  minDiscount?: number;
   attributes?: Record<string, string[]>; // { Color: ["Red","Blue"], Size: ["M"] }
   sort?: "price_asc" | "price_desc" | "newest" | "rating";
   page?: number;
@@ -60,6 +92,7 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
     search,
     minPrice,
     maxPrice,
+    minDiscount,
     attributes,
     sort = "newest",
     page = 1,
@@ -78,8 +111,8 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
 
   if (search) {
     where.OR = [
-      { name: { contains: search} },
-      { description: { contains: search} },
+      { name: { contains: search } },
+      { description: { contains: search } },
     ];
   }
 
@@ -108,24 +141,29 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
       slug: true,
       images: true,
       price: true,
+      mrp: true,
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, stock: true } },
+      variants: { select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
   });
 
   let result = products.map((p) => {
     const hasVariants = p.variants.length > 0;
-    const displayPrice = hasVariants
-      ? Math.min(...p.variants.map((v) => Number(v.price)))
-      : Number(p.price);
-    const inStock = hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+    const { displayPrice, mrp, discountPercent } = resolvePricing(Number(p.price), p.mrp, p.variants);
+    const inStock = hasVariants
+      ? p.variants.some((v) => v.stock > 0)
+      : p.stock > 0;
     const reviewCount = p.reviews.length;
     const avgRating =
       reviewCount > 0
-        ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
+        ? Number(
+            (
+              p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+            ).toFixed(1),
+          )
         : 0;
 
     const imgs = parseImages(p.images);
@@ -137,6 +175,8 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
       slug: p.slug,
       image,
       displayPrice,
+      mrp,
+      discountPercent,
       hasVariants,
       inStock,
       avgRating,
@@ -151,6 +191,10 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
   }
   if (maxPrice !== undefined) {
     result = result.filter((p) => p.displayPrice <= maxPrice);
+  }
+
+    if (minDiscount !== undefined) {
+    result = result.filter((p) => p.discountPercent >= minDiscount);
   }
 
   if (sort === "price_asc") {
@@ -179,7 +223,9 @@ export async function getWebsiteProductBySlugService(slug: string) {
   const product = await prisma.product.findUnique({
     where: { slug },
     include: {
-      category: { select: { id: true, name: true, slug: true, taxClassId: true } },
+      category: {
+        select: { id: true, name: true, slug: true, taxClassId: true },
+      },
       variants: {
         include: {
           attributeValues: {
@@ -199,34 +245,49 @@ export async function getWebsiteProductBySlugService(slug: string) {
     throw new Error("Product not found");
   }
 
+  // const hasVariants = product.variants.length > 0;
+  // const displayPrice = hasVariants
+  //   ? Math.min(...product.variants.map((v) => Number(v.price)))
+  //   : Number(product.price);
   const hasVariants = product.variants.length > 0;
-  const displayPrice = hasVariants
-    ? Math.min(...product.variants.map((v) => Number(v.price)))
-    : Number(product.price);
+  const { displayPrice, mrp, discountPercent } = resolvePricing(
+    Number(product.price),
+    product.mrp,
+    product.variants.map((v) => ({ price: v.price, mrp: v.mrp })),
+  ); // ⬅️ replace purane displayPrice wale 3 lines ko isse
 
   const reviewCount = product.reviews.length;
   const avgRating =
     reviewCount > 0
       ? Number(
-          (product.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1)
+          (
+            product.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+          ).toFixed(1),
         )
       : 0;
 
-  const variants = product.variants.map((v) => ({
-    id: v.id,
-    sku: v.sku,
-    price: Number(v.price),
-    stock: v.stock,
-    attributes: v.attributeValues.map((vav) => ({
-      attributeName: vav.attributeValue.attribute.name,
-      value: vav.attributeValue.value,
-    })),
-  }));
+  const variants = product.variants.map((v) => {
+    const { mrp: variantMrp, discountPercent: variantDiscountPercent } =
+      computeDiscount(Number(v.price), v.mrp);
+    return {
+      id: v.id,
+      sku: v.sku,
+      price: Number(v.price),
+      mrp: variantMrp, // ⬅️ naya
+      discountPercent: variantDiscountPercent, // ⬅️ naya
+      stock: v.stock,
+      attributes: v.attributeValues.map((vav) => ({
+        attributeName: vav.attributeValue.attribute.name,
+        value: vav.attributeValue.value,
+      })),
+    };
+  });
 
   const attributeOptions: Record<string, string[]> = {};
   for (const v of variants) {
     for (const attr of v.attributes) {
-      if (!attributeOptions[attr.attributeName]) attributeOptions[attr.attributeName] = [];
+      if (!attributeOptions[attr.attributeName])
+        attributeOptions[attr.attributeName] = [];
       if (!attributeOptions[attr.attributeName].includes(attr.value)) {
         attributeOptions[attr.attributeName].push(attr.value);
       }
@@ -235,72 +296,85 @@ export async function getWebsiteProductBySlugService(slug: string) {
 
   const relatedRaw = product.categoryId
     ? await prisma.product.findMany({
-        where: { categoryId: product.categoryId, isActive: true, id: { not: product.id } },
+        where: {
+          categoryId: product.categoryId,
+          isActive: true,
+          id: { not: product.id },
+        },
         select: {
           id: true,
           name: true,
           slug: true,
           images: true,
           price: true,
-          variants: { select: { price: true } },
+          mrp: true,
+          variants: { select: { price: true, mrp: true } },
         },
         take: 6,
       })
     : [];
 
-const relatedProducts = relatedRaw.map((p) => {
-  const imgs = parseImages(p.images);
-  return {
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    image: imgs.length > 0 ? formatImageUrl(imgs[0]) : null,
-    displayPrice:
-      p.variants.length > 0 ? Math.min(...p.variants.map((v) => Number(v.price))) : Number(p.price),
-  };
-});
+  const relatedProducts = relatedRaw.map((p) => {
+    const imgs = parseImages(p.images);
+    const { displayPrice, mrp, discountPercent } = resolvePricing(
+      Number(p.price),
+      p.mrp,
+      p.variants,
+    ); // ⬅️ replace
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      image: imgs.length > 0 ? formatImageUrl(imgs[0]) : null,
+      displayPrice,
+      mrp, // ⬅️ naya
+      discountPercent, // ⬅️ naya
+    };
+  });
   const productImages = parseImages(product.images).map(formatImageUrl);
   const storeSettings = await prisma.storeSettings.findFirst();
-const storeCountry = storeSettings?.country ?? "India";
-const storeState = storeSettings?.state ?? "";
+  const storeCountry = storeSettings?.country ?? "India";
+  const storeState = storeSettings?.state ?? "";
 
-const taxClassId = product.taxClassId ?? product.category?.taxClassId ?? null;
+  const taxClassId = product.taxClassId ?? product.category?.taxClassId ?? null;
 
-const { taxAmount: estimatedTaxPercent } = await resolveTaxBreakdown(
-  prisma as unknown as Prisma.TransactionClient,
-  taxClassId,
-  storeCountry,
-  storeState,
-  storeCountry,
-  storeState,
-  100
-);
+  const { taxAmount: estimatedTaxPercent } = await resolveTaxBreakdown(
+    prisma as unknown as Prisma.TransactionClient,
+    taxClassId,
+    storeCountry,
+    storeState,
+    storeCountry,
+    storeState,
+    100,
+  );
 
-return {
-  id: product.id,
-  name: product.name,
-  slug: product.slug,
-  description: product.description,
-  images: productImages,
-  category: product.category,
-  hasVariants,
-  price: hasVariants ? null : Number(product.price),
-  stock: hasVariants ? null : product.stock,
-  displayPrice,
- taxRate: estimatedTaxPercent > 0 ? estimatedTaxPercent : null,
-  variants,
-  attributeOptions,
-  avgRating,
-  reviewCount,
-  reviews: product.reviews.map((r) => ({
-    rating: r.rating,
-    comment: r.comment,
-    images: parseImages(r.images).map(formatImageUrl),
-    customerName: r.customer.name,
-    createdAt: r.createdAt,
-  })),
-  relatedProducts,
-};
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    images: productImages,
+    category: product.category,
+    hasVariants,
+    price: hasVariants ? null : Number(product.price),
+    stock: hasVariants ? null : product.stock,
+    displayPrice,
+    mrp, // ⬅️ naya
+    discountPercent, // ⬅️ naya
+    taxRate: estimatedTaxPercent > 0 ? estimatedTaxPercent : null,
+    variants,
+    attributeOptions,
+    avgRating,
+    reviewCount,
+    reviews: product.reviews.map((r) => ({
+      rating: r.rating,
+      comment: r.comment,
+      images: parseImages(r.images).map(formatImageUrl),
+      customerName: r.customer.name,
+      createdAt: r.createdAt,
+    })),
+    relatedProducts,
+  };
   // Note: costPrice kabhi bhi is response mein nahi hai — business-sensitive field, customer ko kabhi expose nahi karna
 }
 
@@ -370,10 +444,11 @@ async function getProductCardsByIds(productIds: string[]) {
       slug: true,
       images: true,
       price: true,
+      mrp: true,
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, stock: true } },
+      variants: { select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
   });
@@ -381,14 +456,18 @@ async function getProductCardsByIds(productIds: string[]) {
   const cardMap = new Map(
     products.map((p) => {
       const hasVariants = p.variants.length > 0;
-      const displayPrice = hasVariants
-        ? Math.min(...p.variants.map((v) => Number(v.price)))
-        : Number(p.price);
-      const inStock = hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+    const { displayPrice, mrp, discountPercent } = resolvePricing(Number(p.price), p.mrp, p.variants);
+      const inStock = hasVariants
+        ? p.variants.some((v) => v.stock > 0)
+        : p.stock > 0;
       const reviewCount = p.reviews.length;
       const avgRating =
         reviewCount > 0
-          ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
+          ? Number(
+              (
+                p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+              ).toFixed(1),
+            )
           : 0;
 
       const imgs = parseImages(p.images);
@@ -400,8 +479,10 @@ async function getProductCardsByIds(productIds: string[]) {
           id: p.id,
           name: p.name,
           slug: p.slug,
-          image, // ⬅️ ab yeh full URL dega
+          image,
           displayPrice,
+          mrp,
+          discountPercent,
           hasVariants,
           inStock,
           avgRating,
@@ -410,10 +491,12 @@ async function getProductCardsByIds(productIds: string[]) {
           category: p.category,
         },
       ] as const;
-    })
+    }),
   );
 
-  const productIds_ordered = productIds.map((id) => cardMap.get(id)).filter((p) => p !== undefined);
+  const productIds_ordered = productIds
+    .map((id) => cardMap.get(id))
+    .filter((p) => p !== undefined);
   return productIds_ordered;
 }
 
@@ -429,7 +512,10 @@ export async function getTrendingService(limit: number = 10) {
   return getProductCardsByIds(productIds);
 }
 
-export async function getTopRatedService(limit: number = 10, minReviews: number = 3) {
+export async function getTopRatedService(
+  limit: number = 10,
+  minReviews: number = 3,
+) {
   const grouped = await prisma.review.groupBy({
     by: ["productId"],
     where: { isApproved: true },
@@ -444,7 +530,10 @@ export async function getTopRatedService(limit: number = 10, minReviews: number 
   return getProductCardsByIds(productIds); // rating-desc order already preserved
 }
 
-export async function getRecommendedProductsService(customerId: string | null, limit: number = 10) {
+export async function getRecommendedProductsService(
+  customerId: string | null,
+  limit: number = 10,
+) {
   // Guest ya bina history wale customer ke liye — bestseller fallback (cold-start problem ka standard solution)
   if (!customerId) {
     return getBestsellersService(limit);
@@ -461,7 +550,10 @@ export async function getRecommendedProductsService(customerId: string | null, l
     orderItems.length === 0
       ? await prisma.wishlistItem.findMany({
           where: { customerId },
-          select: { productId: true, product: { select: { categoryId: true } } },
+          select: {
+            productId: true,
+            product: { select: { categoryId: true } },
+          },
         })
       : [];
 
@@ -503,10 +595,11 @@ export async function getRecommendedProductsService(customerId: string | null, l
       slug: true,
       images: true,
       price: true,
+      mrp: true,
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, stock: true } },
+      variants: { select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
     take: limit,
@@ -520,14 +613,18 @@ export async function getRecommendedProductsService(customerId: string | null, l
 
   return products.map((p) => {
     const hasVariants = p.variants.length > 0;
-    const displayPrice = hasVariants
-      ? Math.min(...p.variants.map((v) => Number(v.price)))
-      : Number(p.price);
-    const inStock = hasVariants ? p.variants.some((v) => v.stock > 0) : p.stock > 0;
+   const { displayPrice, mrp, discountPercent } = resolvePricing(Number(p.price), p.mrp, p.variants);
+    const inStock = hasVariants
+      ? p.variants.some((v) => v.stock > 0)
+      : p.stock > 0;
     const reviewCount = p.reviews.length;
     const avgRating =
       reviewCount > 0
-        ? Number((p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount).toFixed(1))
+        ? Number(
+            (
+              p.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewCount
+            ).toFixed(1),
+          )
         : 0;
 
     const imgs = parseImages(p.images);
@@ -539,6 +636,8 @@ export async function getRecommendedProductsService(customerId: string | null, l
       slug: p.slug,
       image,
       displayPrice,
+      mrp,
+      discountPercent,
       hasVariants,
       inStock,
       avgRating,
@@ -547,4 +646,41 @@ export async function getRecommendedProductsService(customerId: string | null, l
       category: p.category,
     };
   });
+}
+
+// ==================== Category "Upto X% Off" Deals ====================
+
+interface CategoryDeal {
+  categoryId: string;
+  categoryName: string;
+  categorySlug: string;
+  maxDiscount: number;
+}
+
+export async function getCategoryDealsService(): Promise<CategoryDeal[]> {
+  const deals = await prisma.$queryRaw<CategoryDeal[]>`
+    SELECT c.id as categoryId, c.name as categoryName, c.slug as categorySlug,
+           MAX(discounts.discount) as maxDiscount
+    FROM (
+      SELECT p.categoryId, ROUND(((p.mrp - p.price) / p.mrp) * 100) as discount
+      FROM products p
+      WHERE p.isActive = true AND p.mrp IS NOT NULL AND p.mrp > p.price AND p.categoryId IS NOT NULL
+
+      UNION ALL
+
+      SELECT p.categoryId, ROUND(((pv.mrp - pv.price) / pv.mrp) * 100) as discount
+      FROM product_variants pv
+      JOIN products p ON pv.productId = p.id
+      WHERE p.isActive = true AND pv.mrp IS NOT NULL AND pv.mrp > pv.price AND p.categoryId IS NOT NULL
+    ) as discounts
+    JOIN categories c ON c.id = discounts.categoryId
+    GROUP BY c.id, c.name, c.slug
+    ORDER BY maxDiscount DESC
+  `;
+
+  // MySQL se BigInt/Decimal kabhi-kabhi string/BigInt type mein aata hai raw query se — Number() se normalize kar rahe hain
+  return deals.map((d) => ({
+    ...d,
+    maxDiscount: Number(d.maxDiscount),
+  }));
 }
