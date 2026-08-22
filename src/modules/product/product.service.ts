@@ -8,6 +8,7 @@ interface CreateProductInput {
   description?: string;
   sku: string;
   price: number;
+  mrp?: number;
   costPrice?: number;
   taxClassId?: string;
   categoryId?: string;
@@ -24,6 +25,7 @@ interface UpdateProductInput {
   description?: string;
   sku?: string;
   price?: number;
+  mrp?: number; 
   costPrice?: number;
   taxClassId?: string;
   categoryId?: string;
@@ -52,6 +54,7 @@ interface CreateVariantInput {
   name: string;
   sku: string;
   price: number;
+  mrp?: number;
   stock?: number;
   attributes: AttributeInput[];
 }
@@ -64,12 +67,14 @@ interface AttributeGroup {
 interface GenerateVariantsInput {
   attributeGroups: AttributeGroup[];
   basePrice: number;
+  baseMrp?: number;
   baseStock?: number;
 }
 
 interface UpdateVariantInput {
   name?: string;
   price?: number;
+  mrp?: number;   
   stock?: number;
   images?: string[];
 }
@@ -117,6 +122,7 @@ export async function createProductService(data: CreateProductInput) {
       description: data.description,
       sku: data.sku,
       price: data.price,
+      mrp: data.mrp,   
       costPrice: data.costPrice,
       taxClassId: data.taxClassId,
       categoryId: data.categoryId,
@@ -335,6 +341,7 @@ export async function createVariantService(
       name: data.name,
       sku: data.sku,
       price: data.price,
+      mrp: data.mrp,
       stock: data.stock ?? 0,
       images: JSON.stringify([]),
       attributeValues: {
@@ -404,6 +411,7 @@ export async function updateVariantService(
     data: {
       name: data.name,
       price: data.price,
+      mrp: data.mrp,
       stock: data.stock,
       images: data.images ? JSON.stringify(data.images) : undefined,
     },
@@ -502,6 +510,7 @@ export async function generateVariantsService(
         name: variantName,
         sku,
         price: data.basePrice,
+        mrp: data.baseMrp,
         stock: data.baseStock ?? 0,
         images: JSON.stringify([]),
         attributeValues: {
