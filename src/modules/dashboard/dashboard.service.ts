@@ -29,8 +29,12 @@ interface LowStockVariantRow {
 
 function getThumbnailUrl(images: string | null): string | null {
   if (!images) return null;
-  const imagesArray: string[] = JSON.parse(images);
-  return imagesArray.length ? formatImageUrl(imagesArray[0]) : null;
+  try {
+    const imagesArray: string[] = JSON.parse(images);
+    return Array.isArray(imagesArray) && imagesArray.length ? formatImageUrl(imagesArray[0]) : null;
+  } catch {
+    return null; // corrupted data — crash karne ki jagah null image dikhao
+  }
 }
 
 function resolveDateRange(from?: string, to?: string) {
