@@ -87,10 +87,6 @@ function generateSlug(input: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-// function withFullImageUrls<T extends { images: string[] }>(product: T) {
-//   return { ...product, images: formatImageUrls(product.images) };
-// }
-
 function withFullImageUrls<T extends { images: string | null }>(product: T) {
   let imagesArray: string[] = [];
   if (product.images) {
@@ -103,6 +99,7 @@ function withFullImageUrls<T extends { images: string | null }>(product: T) {
   }
   return { ...product, images: formatImageUrls(imagesArray) };
 }
+
 // ==================== PRODUCT SERVICES ====================
 
 export async function createProductService(data: CreateProductInput) {
