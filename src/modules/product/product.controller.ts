@@ -6,28 +6,49 @@ import * as productService from "./product.service.js";
 export async function createProduct(req: Request, res: Response) {
   try {
     const {
-      name, slug, description, sku, price, mrp, costPrice,
-      taxClassId, categoryId, stock, lowStockThreshold,
-      isReturnable, returnPolicyText,
+      name,
+      slug,
+      description,
+      sku,
+      price,
+      mrp,
+      costPrice,
+      taxClassId,
+      categoryId,
+      stock,
+      lowStockThreshold,
+      isReturnable,
+      returnPolicyText,
     } = req.body;
 
     if (!name || !sku || !price) {
-      return res.status(400).json({ message: "name, sku, and price are required" });
+      return res
+        .status(400)
+        .json({ message: "name, sku, and price are required" });
     }
 
     const files = (req.files as Express.Multer.File[]) || [];
     const images = files.map((file) => `/uploads/${file.filename}`);
 
     const product = await productService.createProductService({
-      name, slug, description, sku,
+      name,
+      slug,
+      description,
+      sku,
       price: Number(price),
-      mrp: mrp ? Number(mrp) : undefined, 
+      mrp: mrp ? Number(mrp) : undefined,
       costPrice: costPrice ? Number(costPrice) : undefined,
-      taxClassId, categoryId,
+      taxClassId,
+      categoryId,
       stock: stock ? Number(stock) : undefined,
-      lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
+      lowStockThreshold: lowStockThreshold
+        ? Number(lowStockThreshold)
+        : undefined,
       images,
-      isReturnable: isReturnable !== undefined ? (isReturnable === "true" || isReturnable === true) : undefined,
+      isReturnable:
+        isReturnable !== undefined
+          ? isReturnable === "true" || isReturnable === true
+          : undefined,
       returnPolicyText,
     });
 
@@ -76,25 +97,51 @@ export async function updateProduct(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const {
-      name, slug, description, sku, price, mrp, costPrice,
-      taxClassId, categoryId, stock, lowStockThreshold, isActive,
-      isReturnable, returnPolicyText,
+      name,
+      slug,
+      description,
+      sku,
+      price,
+      mrp,
+      costPrice,
+      taxClassId,
+      categoryId,
+      stock,
+      lowStockThreshold,
+      isActive,
+      isReturnable,
+      returnPolicyText,
     } = req.body;
 
     const files = (req.files as Express.Multer.File[]) || [];
-    const images = files.length > 0 ? files.map((file) => `/uploads/${file.filename}`) : undefined;
+    const images =
+      files.length > 0
+        ? files.map((file) => `/uploads/${file.filename}`)
+        : undefined;
 
     const product = await productService.updateProductService(id, {
-      name, slug, description, sku,
+      name,
+      slug,
+      description,
+      sku,
       price: price ? Number(price) : undefined,
-      mrp: mrp ? Number(mrp) : undefined, 
+      mrp: mrp ? Number(mrp) : undefined,
       costPrice: costPrice ? Number(costPrice) : undefined,
-      taxClassId, categoryId,
+      taxClassId,
+      categoryId,
       stock: stock ? Number(stock) : undefined,
-      lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
+      lowStockThreshold: lowStockThreshold
+        ? Number(lowStockThreshold)
+        : undefined,
       images,
-      isActive: isActive !== undefined ? (isActive === "true" || isActive === true) : undefined,
-      isReturnable: isReturnable !== undefined ? (isReturnable === "true" || isReturnable === true) : undefined,
+      isActive:
+        isActive !== undefined
+          ? isActive === "true" || isActive === true
+          : undefined,
+      isReturnable:
+        isReturnable !== undefined
+          ? isReturnable === "true" || isReturnable === true
+          : undefined,
       returnPolicyText,
     });
 
@@ -225,7 +272,9 @@ export async function getProductsForPos(req: Request, res: Response) {
       limit: limit ? Number(limit) : undefined,
     });
 
-    return res.status(200).json({ data: result.products, pagination: result.pagination });
+    return res
+      .status(200)
+      .json({ data: result.products, pagination: result.pagination });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }

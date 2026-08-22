@@ -14,8 +14,8 @@ router.get(
   websiteProductController.getRecommendedProducts,
 );
 router.get("/filters", websiteProductController.getWebsiteProductFilters);
-router.get("/", websiteProductController.getAllWebsiteProducts);
 router.get("/category-deals", websiteProductController.getCategoryDeals);  
+router.get("/", websiteProductController.getAllWebsiteProducts);
 router.get("/:slug", websiteProductController.getWebsiteProductBySlug);
 
 

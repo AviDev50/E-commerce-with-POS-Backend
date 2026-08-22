@@ -25,7 +25,7 @@ interface UpdateProductInput {
   description?: string;
   sku?: string;
   price?: number;
-  mrp?: number; 
+  mrp?: number;
   costPrice?: number;
   taxClassId?: string;
   categoryId?: string;
@@ -74,7 +74,7 @@ interface GenerateVariantsInput {
 interface UpdateVariantInput {
   name?: string;
   price?: number;
-  mrp?: number;   
+  mrp?: number;
   stock?: number;
   images?: string[];
 }
@@ -92,12 +92,17 @@ function generateSlug(input: string): string {
 // }
 
 function withFullImageUrls<T extends { images: string | null }>(product: T) {
-  const imagesArray: string[] = product.images
-    ? JSON.parse(product.images)
-    : [];
+  let imagesArray: string[] = [];
+  if (product.images) {
+    try {
+      const parsed = JSON.parse(product.images);
+      imagesArray = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      imagesArray = []; // corrupted data — crash karne ki jagah empty images dikhao
+    }
+  }
   return { ...product, images: formatImageUrls(imagesArray) };
 }
-
 // ==================== PRODUCT SERVICES ====================
 
 export async function createProductService(data: CreateProductInput) {
@@ -122,7 +127,7 @@ export async function createProductService(data: CreateProductInput) {
       description: data.description,
       sku: data.sku,
       price: data.price,
-      mrp: data.mrp,   
+      mrp: data.mrp,
       costPrice: data.costPrice,
       taxClassId: data.taxClassId,
       categoryId: data.categoryId,
@@ -130,7 +135,7 @@ export async function createProductService(data: CreateProductInput) {
       lowStockThreshold: data.lowStockThreshold ?? 5,
       images: JSON.stringify(data.images ?? []),
       isReturnable: data.isReturnable, // explicit diya to wahi, warna null (= category-default resolve hoga read-time pe)
-        returnPolicyText: data.returnPolicyText,
+      returnPolicyText: data.returnPolicyText,
     },
   });
 
@@ -173,7 +178,8 @@ export async function getAllProductsService(query: ProductListQuery) {
       // Resolution: product-level explicit setting > category default > true (fallback)
       // getProductByIdService jaisa hi logic — listing pe bhi badge dikhane ke liye
       isReturnable: p.isReturnable ?? p.category?.isReturnable ?? true,
-      returnPolicyText: p.returnPolicyText ?? p.category?.returnPolicyText ?? null,
+      returnPolicyText:
+        p.returnPolicyText ?? p.category?.returnPolicyText ?? null,
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
@@ -206,8 +212,10 @@ export async function getProductByIdService(id: string) {
   const formatted = withFullImageUrls(product);
 
   // Resolution: product-level explicit setting > category default > true (fallback)
-  const resolvedIsReturnable = product.isReturnable ?? product.category?.isReturnable ?? true;
-const resolvedReturnPolicyText = product.returnPolicyText ?? product.category?.returnPolicyText ?? null;
+  const resolvedIsReturnable =
+    product.isReturnable ?? product.category?.isReturnable ?? true;
+  const resolvedReturnPolicyText =
+    product.returnPolicyText ?? product.category?.returnPolicyText ?? null;
 
   return {
     ...formatted,
