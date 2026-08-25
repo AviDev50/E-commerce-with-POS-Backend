@@ -359,8 +359,8 @@ export async function getWebsiteProductBySlugService(slug: string) {
     price: hasVariants ? null : Number(product.price),
     stock: hasVariants ? null : product.stock,
     displayPrice,
-    mrp, // ⬅️ naya
-    discountPercent, // ⬅️ naya
+    mrp,
+    discountPercent,
     taxRate: estimatedTaxPercent > 0 ? estimatedTaxPercent : null,
     variants,
     attributeOptions,

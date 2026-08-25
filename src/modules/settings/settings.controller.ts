@@ -12,7 +12,7 @@ export async function getStoreSettings(_req: Request, res: Response) {
 
 export async function upsertStoreSettings(req: Request, res: Response) {
   try {
-    const { businessName, logoUrl, email, phone, address, state, currency, taxPercent } = req.body;
+    const { businessName, logoUrl, email, phone, address, state, currency} = req.body;
 
     if (!businessName) {
       return res.status(400).json({ message: "businessName is required" });
@@ -26,7 +26,6 @@ export async function upsertStoreSettings(req: Request, res: Response) {
       address,
       state,
       currency,
-      taxPercent: taxPercent ? Number(taxPercent) : undefined,
     });
 
     return res.status(200).json({ message: "Store settings saved", data: settings });

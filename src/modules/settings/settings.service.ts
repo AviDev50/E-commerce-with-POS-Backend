@@ -8,7 +8,6 @@ interface UpsertSettingsInput {
   address?: string;
   state?: string;
   currency?: string;
-  taxPercent?: number;
 }
 
 export async function getStoreSettingsService() {

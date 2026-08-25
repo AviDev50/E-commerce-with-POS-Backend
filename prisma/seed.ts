@@ -61,6 +61,7 @@ const permissions = [
    { key: "shift:manage", description: "to view reports of a products" },
    { key: "shift:view:all", description: "to view shift of all employee" },
    { key: "order:hold", description: "to create other orders when any customer is busy" },
+   { key: "customer:read", description: "View customer list" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -114,6 +115,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "shift:manage": [Role.ADMIN, Role.CASHIER],
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "customer:read": [Role.ADMIN, Role.MANAGER],
 };
 
 async function seedBootstrapAdmin() {
@@ -122,7 +124,7 @@ async function seedBootstrapAdmin() {
   });
 
   if (existingAdmin) {
-    console.log("ℹ️  Admin already exists, skipping bootstrap admin creation");
+    console.log("Admin already exists, skipping bootstrap admin creation");
     return;
   }
 
@@ -164,7 +166,7 @@ async function main() {
   await seedBootstrapAdmin();
   await seedIndiaTax();
 
-  console.log("✅ Permissions seeded successfully");
+  console.log("Permissions seeded successfully");
 }
 
 main()
@@ -176,12 +178,14 @@ main()
     await prisma.$disconnect();
   });
 
+
+//for each new client we have run this seed script manually according to their state in india
 async function seedIndiaTax() {
   const existing = await prisma.taxClass.findUnique({
     where: { name: "Standard" },
   });
   if (existing) {
-    console.log("ℹ️  Tax data already seeded, skipping");
+    console.log("Tax data already seeded, skipping");
     return;
   }
 
@@ -221,5 +225,5 @@ async function seedIndiaTax() {
     ],
   });
 
-  console.log("✅ Default India tax data seeded (Standard class — 18% GST)");
+  console.log("Default India tax data seeded (Standard class — 18% GST)");
 }

@@ -19,4 +19,11 @@ router.post(
   customerManagementController.quickCreateCustomer,
 );
 
+router.get(
+  "/",
+  verifyToken,
+  checkPermission("customer:read"),
+  customerManagementController.getAllCustomers,
+);
+
 export default router;
