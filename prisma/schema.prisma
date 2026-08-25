@@ -349,7 +349,6 @@ model StoreSettings {
   state        String?
    country      String?
   currency     String   @default("INR")
-  taxPercent   Decimal  @default(0) @db.Decimal(5, 2)
   updatedAt    DateTime @updatedAt
 
   @@map("store_settings")

@@ -27,7 +27,9 @@ export async function quickCreateCustomerService(data: QuickCreateInput) {
   });
 
   if (existing) {
-    const err: any = new Error("Customer with this phone already exists. Please search instead.");
+    const err: any = new Error(
+      "Customer with this phone already exists. Please search instead.",
+    );
     err.statusCode = 409;
     throw err;
   }
@@ -47,5 +49,30 @@ export async function quickCreateCustomerService(data: QuickCreateInput) {
       email: true,
       createdAt: true,
     },
+  });
+}
+
+interface GetAllCustomersFilters {
+  search?: string;
+}
+
+export async function getAllCustomersService(filters: GetAllCustomersFilters) {
+  return prisma.customer.findMany({
+    where: filters.search
+      ? {
+          OR: [
+            { name: { contains: filters.search, mode: "insensitive" } },
+            { phone: { contains: filters.search } },
+          ],
+        }
+      : {},
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
   });
 }
