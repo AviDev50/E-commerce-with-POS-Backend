@@ -211,6 +211,7 @@ model ProductVariant {
   mrp        Decimal? @db.Decimal(10, 2)
   stock      Int      @default(0)
   images     String   @default("[]")
+  isActive   Boolean  @default(true)   
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

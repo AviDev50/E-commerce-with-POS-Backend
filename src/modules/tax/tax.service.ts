@@ -124,3 +124,61 @@ export async function updateTaxRateService(id: string, data: UpdateTaxRateInput)
 
   return prisma.taxRate.update({ where: { id }, data });
 }
+
+interface ProvisionDefaultTaxInput {
+  state: string;
+  gstRate?: number; // total GST % — default 18, CGST/SGST isको half-half split karenge
+}
+
+export async function provisionDefaultIndiaTaxService(data: ProvisionDefaultTaxInput) {
+  const gstRate = data.gstRate ?? 18;
+  const halfRate = gstRate / 2;
+
+  const existing = await prisma.taxClass.findUnique({
+    where: { name: "Standard" },
+  });
+
+  if (existing) {
+    const err: any = new Error("Tax data already provisioned for this store");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const standardClass = await prisma.taxClass.create({
+    data: { name: "Standard" },
+  });
+
+  await prisma.taxRate.createMany({
+    data: [
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: data.state,
+        name: "CGST",
+        rate: halfRate,
+        appliesWhen: "ORIGIN_MATCH",
+        priority: 1,
+      },
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: data.state,
+        name: "SGST",
+        rate: halfRate,
+        appliesWhen: "ORIGIN_MATCH",
+        priority: 2,
+      },
+      {
+        taxClassId: standardClass.id,
+        country: "India",
+        state: null,
+        name: "IGST",
+        rate: gstRate,
+        appliesWhen: "ORIGIN_MISMATCH",
+        priority: 1,
+      },
+    ],
+  });
+
+  return { message: `Default India tax data seeded for ${data.state} (${gstRate}% GST)`, taxClassId: standardClass.id };
+}

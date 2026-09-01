@@ -77,6 +77,7 @@ interface UpdateVariantInput {
   mrp?: number;
   stock?: number;
   images?: string[];
+  isActive?: boolean;
 }
 
 function generateSlug(input: string): string {
@@ -397,7 +398,10 @@ export async function deleteVariantService(variantId: string) {
     throw new Error("Variant not found");
   }
 
-  return prisma.productVariant.delete({ where: { id: variantId } });
+  return prisma.productVariant.update({
+    where: { id: variantId },
+    data: { isActive: false },
+  });
 }
 
 export async function updateVariantService(
@@ -419,6 +423,7 @@ export async function updateVariantService(
       mrp: data.mrp,
       stock: data.stock,
       images: data.images ? JSON.stringify(data.images) : undefined,
+      isActive: data.isActive,
     },
     include: {
       attributeValues: {
@@ -432,6 +437,7 @@ export async function updateVariantService(
     images: formatImageUrls(JSON.parse(variant.images || "[]")),
   };
 }
+
 // Cartesian product helper — [[A,B],[X,Y]] → [[A,X],[A,Y],[B,X],[B,Y]]
 function cartesianProduct<T>(arrays: T[][]): T[][] {
   return arrays.reduce<T[][]>(

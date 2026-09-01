@@ -62,6 +62,7 @@ const permissions = [
    { key: "shift:view:all", description: "to view shift of all employee" },
    { key: "order:hold", description: "to create other orders when any customer is busy" },
    { key: "customer:read", description: "View customer list" },
+   { key: "tax:manage", description: "To create tax class and rate"},
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -116,6 +117,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "customer:read": [Role.ADMIN, Role.MANAGER],
+  "tax:manage":[Role.ADMIN]
 };
 
 async function seedBootstrapAdmin() {
@@ -179,7 +181,7 @@ main()
   });
 
 
-//for each new client we have run this seed script manually according to their state in india
+//no needed now , we created api for this new one time onboarding api for new store
 async function seedIndiaTax() {
   const existing = await prisma.taxClass.findUnique({
     where: { name: "Standard" },

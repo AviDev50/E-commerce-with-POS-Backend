@@ -112,3 +112,22 @@ export async function updateTaxRate(req: Request, res: Response) {
     return res.status(400).json({ message: error.message });
   }
 }
+
+export async function provisionDefaultTax(req: Request, res: Response) {
+  try {
+    const { state, gstRate } = req.body;
+
+    if (!state) {
+      return res.status(400).json({ message: "state is required" });
+    }
+
+    const result = await taxService.provisionDefaultIndiaTaxService({
+      state,
+      gstRate: gstRate ? Number(gstRate) : undefined,
+    });
+
+    return res.status(201).json({ message: result.message, data: { taxClassId: result.taxClassId } });
+  } catch (error: any) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}
