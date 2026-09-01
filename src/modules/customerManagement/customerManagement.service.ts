@@ -61,8 +61,7 @@ export async function getAllCustomersService(filters: GetAllCustomersFilters) {
     where: filters.search
       ? {
           OR: [
-            { name: { contains: filters.search, mode: "insensitive" } },
-            { phone: { contains: filters.search } },
+                 { phone: { contains: filters.search } },
           ],
         }
       : {},
