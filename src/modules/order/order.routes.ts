@@ -45,4 +45,11 @@ router.post(
   orderController.refundOrder,
 );
 
+router.get(
+  "/pos/history",
+  verifyToken,
+  checkPermission("order:read"),
+  orderController.getPosOrderHistory,
+);
+
 export default router;
