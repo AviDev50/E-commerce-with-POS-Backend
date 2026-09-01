@@ -836,3 +836,67 @@ export async function getOrderReceiptService(id: string, requestingCustomerId?: 
     total: Number(order.total),
   };
 }
+
+interface PosOrderHistoryFilters {
+  from?: string;
+  to?: string;
+  cashierId?: string;
+  requestingUserId: string;
+  requestingUserRole: string;
+  page?: number;
+  limit?: number;
+}
+
+export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters) {
+  const page = filters.page && filters.page > 0 ? filters.page : 1;
+  const limit = filters.limit && filters.limit > 0 ? filters.limit : 20;
+
+  // Cashier-scoping: CASHIER role apne aap sirf apna data dekhega, override nahi ho sakta
+  let effectiveCashierId: string | undefined;
+  if (filters.requestingUserRole === "CASHIER") {
+    effectiveCashierId = filters.requestingUserId;
+  } else if (filters.cashierId) {
+    effectiveCashierId = filters.cashierId;
+  }
+
+  const where: any = { channel: "POS" };
+  if (effectiveCashierId) {
+    where.createdById = effectiveCashierId;
+  }
+  if (filters.from || filters.to) {
+    where.createdAt = {};
+    if (filters.from) where.createdAt.gte = new Date(filters.from);
+    if (filters.to) where.createdAt.lte = new Date(filters.to);
+  }
+
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      include: {
+        orderItems: { select: { id: true, quantity: true } },
+        payments: { select: { method: true, amount: true } },
+        customer: { select: { name: true, phone: true } },
+        createdBy: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return {
+    orders: orders.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status,
+      customerName: o.customer?.name ?? "Walk-in",
+      cashierName: o.createdBy?.name ?? null,
+      itemCount: o.orderItems.length,
+      payments: o.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
+      total: Number(o.total),
+      createdAt: o.createdAt,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}

@@ -192,3 +192,23 @@ export async function getOrderReceipt(req: Request, res: Response) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }
 }
+
+export async function getPosOrderHistory(req: Request, res: Response) {
+  try {
+    const { from, to, cashierId, page, limit } = req.query;
+
+    const result = await orderService.getPosOrderHistoryService({
+      from: from as string | undefined,
+      to: to as string | undefined,
+      cashierId: cashierId as string | undefined,
+      requestingUserId: req.user!.id,
+      requestingUserRole: req.user!.role,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+
+    return res.status(200).json({ data: result.orders, pagination: result.pagination });
+  } catch (error: any) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}
