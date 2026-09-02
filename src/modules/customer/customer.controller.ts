@@ -4,11 +4,11 @@ import * as customerService from "./customer.service.js";
 // ==================== REGISTER CUSTOMER ====================
 export async function registerCustomer(req: Request, res: Response) {
   try {
-    const { name, phone, email, password, dob, gender } = req.body;
+    const { name, phone, email, password} = req.body;
 
-    if (!name || !phone || !password || !dob || !gender) {
+    if (!name || !phone || !password) {
       return res.status(400).json({
-        message: "name, phone, password, dob, and gender are required",
+        message: "name, phone, password are required",
       });
     }
 
@@ -16,9 +16,7 @@ export async function registerCustomer(req: Request, res: Response) {
       name,
       phone,
       email,
-      password,
-      dob,
-      gender,
+      password
     });
 
     return res.status(201).json({ message: "Customer registered successfully", data: customer });
