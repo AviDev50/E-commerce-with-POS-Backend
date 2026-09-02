@@ -59,6 +59,12 @@ export async function loginService(data: LoginInput) {
     throw new Error("Invalid phone number or password");
   }
 
+  if (!user.isActive) {
+    const err: any = new Error("Your account has been deactivated. Please contact your admin.");
+    err.statusCode = 403;
+    throw err;
+  }
+
   const isPasswordValid = await bcrypt.compare(data.password, user.password);
 
   if (!isPasswordValid) {
@@ -90,6 +96,12 @@ export async function refreshAccessTokenService(rawRefreshToken: string) {
 
   if (!stored || stored.revoked || stored.expiresAt < new Date() || !stored.user) {
     throw new Error("Invalid or expired refresh token");
+  }
+
+  if (!stored.user.isActive) {
+    const err: any = new Error("Your account has been deactivated.");
+    err.statusCode = 403;
+    throw err;
   }
 
   await prisma.refreshToken.update({ where: { id: stored.id }, data: { revoked: true } });
