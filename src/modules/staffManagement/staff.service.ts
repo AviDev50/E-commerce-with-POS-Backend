@@ -61,12 +61,19 @@ export async function deactivateStaffService(id: string, requestedById: string) 
       throw err;
     }
   }
-
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id },
     data: { isActive: false },
     select: staffSelect,
   });
+
+  // NAYA: saare refresh tokens revoke karo — turant access cut ho
+  await prisma.refreshToken.updateMany({
+    where: { userId: id },
+    data: { revoked: true },
+  });
+
+  return updated;
 }
 
 export async function activateStaffService(id: string) {
