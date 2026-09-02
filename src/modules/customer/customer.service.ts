@@ -2,15 +2,15 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../../config/db.js";
 import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken.js";
-import {Gender} from "@prisma/client"
+//import {Gender} from "@prisma/client"
 
 interface RegisterInput {
   name: string;
   phone: string;
   email?: string;
   password: string;
-  dob: string;
-  gender: Gender;
+  // dob: string;
+  // gender: Gender
 }
 
 interface LoginInput {
@@ -34,11 +34,11 @@ export async function registerCustomerService(data: RegisterInput) {
     throw err;
   }
 
-  if (!["MALE", "FEMALE", "OTHER"].includes(data.gender)) {
-    const err: any = new Error("Invalid gender value");
-    err.statusCode = 400;
-    throw err;
-  }
+  // if (!["MALE", "FEMALE", "OTHER"].includes(data.gender)) {
+  //   const err: any = new Error("Invalid gender value");
+  //   err.statusCode = 400;
+  //   throw err;
+  // }
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -48,8 +48,8 @@ export async function registerCustomerService(data: RegisterInput) {
       phone: data.phone,
       email: data.email,
       password: hashedPassword,
-      dob: new Date(data.dob),
-      gender: data.gender,
+      // dob: new Date(data.dob),
+      // gender: data.gender,
     },
   });
 
