@@ -14,7 +14,11 @@ export async function getPageByTypeService(type: PageType) {
   return page;
 }
 
-export async function upsertPageService(type: PageType, title: string, content: string) {
+export async function upsertPageService(
+  type: PageType,
+  title: string,
+  content: string,
+) {
   if (!title?.trim() || !content?.trim()) {
     throw new Error("title and content are required");
   }
