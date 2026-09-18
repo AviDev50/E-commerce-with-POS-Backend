@@ -6,7 +6,10 @@ import { Role } from "@prisma/client";
 
 const router = Router();
 
-// Sirf ADMIN — Manager ko access nahi (privilege escalation se bachne ke liye)
+// NAYA: har logged-in staff (kisī bhi role) apni khud ki permissions dekh sakta hai
+router.get("/my", verifyToken, permissionController.getMyPermissions);
+
+// Sirf ADMIN — baaki sab management routes (assign/revoke/kisi bhi role ki list)
 router.use(verifyToken, authorizeRoles(Role.ADMIN));
 
 router.get("/", permissionController.getAllPermissions);

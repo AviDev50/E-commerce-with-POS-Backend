@@ -63,6 +63,7 @@ const permissions = [
    { key: "order:hold", description: "to create other orders when any customer is busy" },
    { key: "customer:read", description: "View customer list" },
    { key: "tax:manage", description: "To create tax class and rate"},
+   { key: "order:exchange:pos", description: "Process instant POS exchange" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -112,12 +113,13 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "page:read": [Role.ADMIN],
   "page:update": [Role.ADMIN],
   "product:view:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
-  "report:sales:view": [Role.ADMIN, Role.CASHIER],
+  "report:sales:view": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "shift:manage": [Role.ADMIN, Role.CASHIER, Role.MANAGER],
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "customer:read": [Role.ADMIN, Role.MANAGER],
-  "tax:manage":[Role.ADMIN]
+  "tax:manage":[Role.ADMIN],
+  "order:exchange:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
 
 async function seedBootstrapAdmin() {
@@ -179,7 +181,6 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
 
 //no needed now , we created api for this new one time onboarding api for new store
 async function seedIndiaTax() {
