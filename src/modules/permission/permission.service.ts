@@ -67,3 +67,12 @@ export async function revokePermissionService(
 
   return { role, permissionKey, revoked: true };
 }
+
+export async function getMyPermissionsService(role: Role) {
+  const rolePermissions = await prisma.rolePermission.findMany({
+    where: { role },
+    include: { permission: true },
+  });
+
+  return rolePermissions.map((rp) => rp.permission.key);
+}
