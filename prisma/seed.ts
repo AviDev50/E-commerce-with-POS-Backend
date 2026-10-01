@@ -58,12 +58,15 @@ const permissions = [
   },
   { key: "product:view:pos", description: "to view pos products" },
   { key: "report:sales:view", description: "to view reports of a products" },
-   { key: "shift:manage", description: "to view reports of a products" },
-   { key: "shift:view:all", description: "to view shift of all employee" },
-   { key: "order:hold", description: "to create other orders when any customer is busy" },
-   { key: "customer:read", description: "View customer list" },
-   { key: "tax:manage", description: "To create tax class and rate"},
-   { key: "order:exchange:pos", description: "Process instant POS exchange" },
+  { key: "shift:manage", description: "to view reports of a products" },
+  { key: "shift:view:all", description: "to view shift of all employee" },
+  {
+    key: "order:hold",
+    description: "to create other orders when any customer is busy",
+  },
+  { key: "customer:read", description: "View customer list" },
+  { key: "tax:manage", description: "To create tax class and rate" },
+  { key: "order:exchange:pos", description: "Process instant POS exchange" },
 ];
 
 const defaultRoleMapping: Record<string, Role[]> = {
@@ -118,7 +121,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "customer:read": [Role.ADMIN, Role.MANAGER],
-  "tax:manage":[Role.ADMIN],
+  "tax:manage": [Role.ADMIN],
   "order:exchange:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
 };
 

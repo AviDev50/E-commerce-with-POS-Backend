@@ -81,7 +81,9 @@ export async function revokePermission(req: Request, res: Response) {
 
 export async function getMyPermissions(req: Request, res: Response) {
   try {
-    const permissions = await permissionService.getMyPermissionsService(req.user!.role);
+    const permissions = await permissionService.getMyPermissionsService(
+      req.user!.role,
+    );
     return res.status(200).json({ data: permissions });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
