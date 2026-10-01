@@ -22,6 +22,7 @@ interface PaymentInput {
 interface CreatePosOrderInput {
   items: OrderItemInput[];
   customerId?: string;
+  newCustomer?: { name: string; phone: string; email?: string };
   couponCode?: string;
   payments: PaymentInput[]; // paymentMethod (single) ki jagah ab ye array hai
   createdById: string;
@@ -53,6 +54,36 @@ interface ResolvedItem {
 }
 
 // ==================== SHARED HELPERS ====================
+async function resolvePosCustomer(
+  tx: Prisma.TransactionClient,
+  data: CreatePosOrderInput,
+) {
+  let customer;
+
+  if (data.newCustomer) {
+    const { name, phone, email } = data.newCustomer;
+    try {
+      customer = await tx.customer.upsert({
+        where: { phone },
+        update: {}, // existing ka data overwrite nahi
+        create: { name, phone, email },
+      });
+    } catch (e: any) {
+      // MySQL pe upsert atomic nahi hai → race mein P2002 aayega
+      if (e.code !== "P2002") throw e;
+      customer = await tx.customer.findUnique({ where: { phone } });
+    }
+  } else {
+    customer = await tx.customer.findUnique({ where: { id: data.customerId } });
+  }
+
+  if (!customer || !customer.isActive) {
+    const err: any = new Error("Customer not found or inactive");
+    err.statusCode = 400;
+    throw err;
+  }
+  return customer;
+}
 
 async function resolveOrderItems(
   tx: Prisma.TransactionClient,
@@ -358,6 +389,9 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
       err.statusCode = 400;
       throw err;
     }
+
+    const customer = await resolvePosCustomer(tx, data);
+
     const resolvedItems = await resolveOrderItems(tx, data.items);
     await deductStock(tx, resolvedItems);
 
@@ -412,7 +446,7 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         orderNumber,
         channel: "POS",
         status: "COMPLETED",
-        customerId: data.customerId,
+        customerId:  customer.id,
         createdById: data.createdById,
             shiftId: activeShift.id, // NAYA: order ko shift se link kiya
         couponId,

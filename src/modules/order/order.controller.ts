@@ -4,21 +4,38 @@ import { hasPermission } from "../../middlewares/permission.middleware.js";
 
 export async function createPosOrder(req: Request, res: Response) {
   try {
-    const { items, customerId, couponCode, payments } = req.body;
+    const { items, customerId, newCustomer, couponCode, payments } = req.body;
 
-    // items check — pehle jaisa hi
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "items are required" });
     }
 
-    // paymentMethod (single) ki jagah ab payments (array) required hai
+    // Exactly one: existing customer YA new customer
+    if (!!customerId === !!newCustomer) {
+      return res
+        .status(400)
+        .json({ message: "Select an existing customer or add a new one" });
+    }
+
+    if (newCustomer) {
+      const name = String(newCustomer.name ?? "").trim();
+      const phone = String(newCustomer.phone ?? "").trim();
+      if (!name) {
+        return res.status(400).json({ message: "Customer name is required" });
+      }
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        return res.status(400).json({ message: "Invalid customer phone" });
+      }
+      newCustomer.name = name;
+      newCustomer.phone = phone;
+    }
+
     if (!payments || !Array.isArray(payments) || payments.length === 0) {
       return res
         .status(400)
         .json({ message: "payments array is required (at least one entry)" });
     }
 
-    // har payment entry ke andar method + amount dono hone chahiye
     for (const p of payments) {
       if (!p.method || typeof p.amount !== "number" || p.amount <= 0) {
         return res.status(400).json({
@@ -30,6 +47,7 @@ export async function createPosOrder(req: Request, res: Response) {
     const order = await orderService.createPosOrderService({
       items,
       customerId,
+      newCustomer,
       couponCode,
       payments,
       createdById: req.user!.id,
