@@ -917,7 +917,15 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
     prisma.order.findMany({
       where,
       include: {
-        orderItems: { select: { id: true, quantity: true } },
+        orderItems: {
+          select: {
+            id: true,
+            quantity: true,
+            returnedQty: true,
+            product: { select: { name: true } },
+            variant: { select: { name: true } },
+          },
+        },
         payments: { select: { method: true, amount: true } },
         customer: { select: { name: true, phone: true } },
         createdBy: { select: { name: true } },
@@ -937,6 +945,14 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
       customerName: o.customer?.name ?? "Walk-in",
       cashierName: o.createdBy?.name ?? null,
       itemCount: o.orderItems.length,
+      items: o.orderItems.map((i) => ({
+        id: i.id, // OrderItem.id, exchange API ke orderItemId ke liye
+        productName: i.variant?.name
+          ? `${i.product.name} - ${i.variant.name}`
+          : i.product.name,
+        quantity: i.quantity,
+        returnedQty: i.returnedQty,
+      })),
       payments: o.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
       total: Number(o.total),
       createdAt: o.createdAt,
