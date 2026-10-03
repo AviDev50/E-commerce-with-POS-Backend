@@ -328,6 +328,7 @@ model Refund {
   orderId       String
   order         Order        @relation(fields: [orderId], references: [id])
   amount        Decimal      @db.Decimal(10, 2)
+  method        PaymentMethod?   // from which method new refund is given(drawer-cash vs gateway)
   reason        String
   status        RefundStatus @default(PENDING)
   processedById String?

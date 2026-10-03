@@ -230,3 +230,29 @@ export async function getPosOrderHistory(req: Request, res: Response) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }
 }
+
+export async function instantPosExchange(req: Request, res: Response) {
+  try {
+    const { orderItemId, quantity, newProductId, newVariantId, payments, refundMethod } = req.body;
+
+    if (!orderItemId || !quantity || !newProductId) {
+      return res.status(400).json({
+        message: "orderItemId, quantity, and newProductId are required",
+      });
+    }
+
+    const result = await orderService.instantPosExchangeService({
+      orderItemId,
+      quantity,
+      newProductId,
+      newVariantId,
+      payments,
+      refundMethod,
+      createdById: req.user!.id,
+    });
+
+    return res.status(201).json({ message: "Exchange completed", data: result });
+  } catch (error: any) {
+    return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}
