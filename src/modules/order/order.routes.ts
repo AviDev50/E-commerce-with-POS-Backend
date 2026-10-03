@@ -52,4 +52,11 @@ router.get(
   orderController.getPosOrderHistory,
 );
 
+router.post(
+  "/pos/exchange",
+  verifyToken,
+  checkPermission("order:exchange:pos"),
+  orderController.instantPosExchange,
+);
+
 export default router;

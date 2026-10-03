@@ -53,6 +53,16 @@ interface ResolvedItem {
   taxClassId: string | null;
 }
 
+interface InstantExchangeInput {
+  orderItemId: string; // original order ka item jo exchange ho raha hai
+  quantity: number;
+  newProductId: string;
+  newVariantId?: string;
+  payments?: PaymentInput[]; // agar naya item mehenga hai — customer se extra liya
+  refundMethod?: PaymentMethod; // agar naya item sasta hai — customer ko wapas diya
+  createdById: string;
+}
+
 // ==================== SHARED HELPERS ====================
 async function resolvePosCustomer(
   tx: Prisma.TransactionClient,
@@ -933,4 +943,163 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
     })),
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
+}
+
+export async function instantPosExchangeService(data: InstantExchangeInput) {
+  return prisma.$transaction(async (tx) => {
+    const originalItem = await tx.orderItem.findUnique({
+      where: { id: data.orderItemId },
+      include: { order: true, product: true, variant: true },
+    });
+
+    if (!originalItem) {
+      const err: any = new Error("Original order item not found");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const alreadyReturned = originalItem.returnedQty;
+    const availableToExchange = originalItem.quantity - alreadyReturned;
+    if (data.quantity <= 0 || data.quantity > availableToExchange) {
+      const err: any = new Error(
+        `Invalid quantity — only ${availableToExchange} unit(s) available to exchange`,
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // ---- Step 1: purane item ka stock restore karo ----
+    if (originalItem.variantId) {
+      await tx.productVariant.update({
+        where: { id: originalItem.variantId },
+        data: { stock: { increment: data.quantity } },
+      });
+    } else {
+      await tx.product.update({
+        where: { id: originalItem.productId },
+        data: { stock: { increment: data.quantity } },
+      });
+    }
+
+    // returnedQty mark karo taaki dobara same quantity exchange na ho sake
+    await tx.orderItem.update({
+      where: { id: data.orderItemId },
+      data: { returnedQty: { increment: data.quantity } },
+    });
+
+    // ---- Step 2: naye item ka price/tax resolve + stock deduct karo ----
+    const resolvedNewItems = await resolveOrderItems(tx, [
+      { productId: data.newProductId, variantId: data.newVariantId, quantity: data.quantity },
+    ]);
+    await deductStock(tx, resolvedNewItems);
+
+    const storeSettings = await tx.storeSettings.findFirst();
+    const storeCountry = storeSettings?.country ?? "India";
+    const storeState = storeSettings?.state ?? "";
+
+    const itemsWithTax = await buildItemsWithTax(
+      tx,
+      resolvedNewItems,
+      storeCountry,
+      storeState,
+      storeCountry,
+      storeState,
+    );
+
+    const newItemTotal = itemsWithTax.reduce(
+      (sum, i) => sum + i.subtotal + i.taxAmount,
+      0,
+    );
+
+    // ---- Step 3: original item ka refund-equivalent value nikaalo ----
+    const perUnitOriginalTotal =
+      (Number(originalItem.subtotal) + Number(originalItem.taxAmount)) / originalItem.quantity;
+    const originalItemTotal = Number((perUnitOriginalTotal * data.quantity).toFixed(2));
+
+    const priceDiff = Number((newItemTotal - originalItemTotal).toFixed(2));
+
+    // ---- Step 4: price-diff validate karo ----
+    if (priceDiff > 0) {
+      // Naya item mehenga — customer se extra payment lena hai
+      if (!data.payments || data.payments.length === 0) {
+        const err: any = new Error(
+          `New item is costlier by ₹${priceDiff}. Payment is required.`,
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+      const paymentsTotal = data.payments.reduce((sum, p) => sum + p.amount, 0);
+      if (Math.round(paymentsTotal * 100) !== Math.round(priceDiff * 100)) {
+        const err: any = new Error(
+          `Payment amount (${paymentsTotal}) does not match price difference (${priceDiff})`,
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+    } else if (priceDiff < 0) {
+      // Naya item sasta — customer ko wapas dena hai
+      if (!data.refundMethod) {
+        const err: any = new Error(
+          `New item is cheaper by ₹${Math.abs(priceDiff)}. refundMethod is required.`,
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+
+    // ---- Step 5: naya POS exchange-order create karo (turant COMPLETED) ----
+    const orderNumber = await generateOrderNumber(tx);
+
+    const exchangeOrder = await tx.order.create({
+      data: {
+        orderNumber,
+        channel: "POS",
+        status: "COMPLETED",
+        customerId: originalItem.order.customerId, // walk-in ho to null hi carry-forward hoga
+        createdById: data.createdById,
+        subtotal: itemsWithTax.reduce((sum, i) => sum + i.subtotal, 0),
+        tax: itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0),
+        discount: 0,
+        total: newItemTotal,
+        orderItems: {
+          create: itemsWithTax.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.subtotal,
+            taxAmount: i.taxAmount,
+            taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+          })),
+        },
+        payments: priceDiff > 0 && data.payments
+          ? {
+              create: data.payments.map((p) => ({
+                method: p.method,
+                status: "PAID",
+                amount: p.amount,
+              })),
+            }
+          : undefined,
+      },
+      include: { orderItems: true, payments: true },
+    });
+
+    // ---- Step 6: agar refund dena tha, Refund record banao ----
+    let refund = null;
+    if (priceDiff < 0) {
+      refund = await tx.refund.create({
+        data: {
+          orderId: originalItem.orderId, // original order ke against refund
+          amount: Math.abs(priceDiff),
+          method: data.refundMethod,
+          reason: "Instant POS exchange — price difference refund",
+          status: "COMPLETED",
+          processedById: data.createdById,
+        },
+      });
+    }
+
+    return { exchangeOrder, refund, priceDiff };
+  });
 }
