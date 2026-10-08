@@ -1,19 +1,11 @@
 import prisma from "../../config/db.js";
-import { ReturnStatus, ReturnType, OrderStatus } from "@prisma/client";
-import {
-  withFullImageUrls,
-  formatReturnResponse,
-} from "../../utils/returnFormat.js";
+import { ReturnStatus, ReturnType, OrderStatus, OrderChannel, Prisma } from "@prisma/client";
+import { withFullImageUrls, formatReturnResponse } from "../../utils/returnFormat.js";
+import { fail } from "../../utils/fail.js";
+import { DEFAULT_RETURN_WINDOW_DAYS, PENDING_RETURN_STATUSES } from "../../utils/returnPolicy.js";
+import { resolveOrderItems } from "../order/order.service.js"; // path apne folder ke hisaab se
 
-const RETURN_WINDOW_DAYS = 7;
-
-const ACTIVE_STATUSES: ReturnStatus[] = [
-  ReturnStatus.REQUESTED,
-  ReturnStatus.APPROVED,
-  ReturnStatus.PICKUP_SCHEDULED,
-  ReturnStatus.RECEIVED,
-];
-
+// purane RETURN_WINDOW_DAYS aur ACTIVE_STATUSES delete karo, CANCELLABLE_STATUSES rakho
 const CANCELLABLE_STATUSES: ReturnStatus[] = [
   ReturnStatus.REQUESTED,
   ReturnStatus.APPROVED,
@@ -26,6 +18,7 @@ interface CreateReturnRequestInput {
   reasonNote?: string;
   images?: string[];
   quantity: number;
+  exchangeProductId?: string;
   exchangeVariantId?: string;
 }
 
@@ -34,131 +27,81 @@ export async function createReturnRequest(
   customerId: string,
   data: CreateReturnRequestInput,
 ) {
-  if (data.quantity <= 0) {
-    const error: any = new Error("Quantity must be greater than 0");
-    error.statusCode = 400;
-    throw error;
+  if (!Number.isInteger(data.quantity) || data.quantity <= 0) {
+    return fail("Quantity must be a positive whole number");
   }
 
   const orderItem = await prisma.orderItem.findUnique({
     where: { id: data.orderItemId },
     include: {
       order: true,
-      product: { include: { category: true } }, // category chahiye resolve karne ke liye
+      product: { include: { category: true } },
     },
   });
 
-  if (!orderItem) {
-    const error: any = new Error("Order item not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
+  if (!orderItem) return fail("Order item not found", 404);
   if (orderItem.order.customerId !== customerId) {
-    const error: any = new Error("This order item does not belong to you");
-    error.statusCode = 403;
-    throw error;
+    return fail("This order item does not belong to you", 403);
+  }
+  if (orderItem.order.channel !== OrderChannel.ONLINE) {
+    return fail("POS orders can only be returned at the store");
   }
 
-  // Resolution order: product-level explicit setting > category default > true (fallback)
+  // product-level setting > category default > true
   const isReturnable =
     orderItem.product.isReturnable ??
     orderItem.product.category?.isReturnable ??
     true;
-
   if (!isReturnable) {
-    const error: any = new Error(
-      "This product is not eligible for return or exchange",
-    );
-    error.statusCode = 400;
-    throw error;
+    return fail("This product is not eligible for return or exchange");
   }
 
   if (orderItem.order.status !== OrderStatus.COMPLETED) {
-    const error: any = new Error(
-      "Return can only be requested for completed orders",
-    );
-    error.statusCode = 400;
-    throw error;
+    return fail("Return can only be requested for completed orders");
   }
 
-  if (!orderItem.order.deliveredAt) {
-    const error: any = new Error(
-      "This order has not been marked as delivered yet",
-    );
-    error.statusCode = 400;
-    throw error;
-  }
+  const deliveredAt =
+    orderItem.order.deliveredAt ?? fail("This order has not been marked as delivered yet");
 
-  const windowEnd = new Date(orderItem.order.deliveredAt);
-  windowEnd.setDate(windowEnd.getDate() + RETURN_WINDOW_DAYS);
-
+  const settings = await prisma.storeSettings.findFirst();
+  const windowDays = settings?.returnWindowDays ?? DEFAULT_RETURN_WINDOW_DAYS;
+  const windowEnd = new Date(deliveredAt);
+  windowEnd.setDate(windowEnd.getDate() + windowDays);
   if (new Date() > windowEnd) {
-    const error: any = new Error(
-      `Return window of ${RETURN_WINDOW_DAYS} days has expired`,
-    );
-    error.statusCode = 400;
-    throw error;
+    return fail(`Return window of ${windowDays} days has expired`);
   }
 
   const activeReturns = await prisma.returnRequest.findMany({
-    where: { orderItemId: data.orderItemId, status: { in: ACTIVE_STATUSES } },
+    where: { orderItemId: data.orderItemId, status: { in: PENDING_RETURN_STATUSES } },
     select: { quantity: true },
   });
-  const alreadyPendingQty = activeReturns.reduce(
-    (sum, r) => sum + r.quantity,
-    0,
-  );
-  const availableQty =
-    orderItem.quantity - orderItem.returnedQty - alreadyPendingQty;
+  const alreadyPendingQty = activeReturns.reduce((sum, r) => sum + r.quantity, 0);
+  const availableQty = orderItem.quantity - orderItem.returnedQty - alreadyPendingQty;
 
   if (data.quantity > availableQty) {
-    const error: any = new Error(
-      `Only ${availableQty} unit(s) of this item are eligible for return`,
-    );
-    error.statusCode = 400;
-    throw error;
+    return fail(`Only ${availableQty} unit(s) of this item are eligible for return`);
   }
 
- if (data.type === ReturnType.EXCHANGE) {
-  // Case 1: Variant-based product — customer size/color badalna chahta hai
-  if (orderItem.variantId) {
-    if (!data.exchangeVariantId) {
-      const error: any = new Error("exchangeVariantId is required to exchange a variant product");
-      error.statusCode = 400;
-      throw error;
-    }
+  const isExchange = data.type === ReturnType.EXCHANGE;
 
-    const exchangeVariant = await prisma.productVariant.findUnique({
-      where: { id: data.exchangeVariantId },
-    });
-
-    if (!exchangeVariant) {
-      const error: any = new Error("Exchange variant not found");
-      error.statusCode = 404;
-      throw error;
+  if (isExchange) {
+    if (!data.exchangeProductId) {
+      return fail("exchangeProductId is required for an exchange");
     }
-
-    if (exchangeVariant.productId !== orderItem.productId) {
-      const error: any = new Error("Exchange variant must belong to the same product");
-      error.statusCode = 400;
-      throw error;
-    }
-  } else {
-    // Case 2: Simple product (no variant) — defect replacement, same product hi wapas milega
-    if (data.exchangeVariantId) {
-      const error: any = new Error("This product has no variants — exchangeVariantId should not be sent");
-      error.statusCode = 400;
-      throw error;
-    }
-    // stock check yahan — same product ka fresh piece available hona chahiye
-    if (orderItem.product.stock < data.quantity) {
-      const error: any = new Error("Replacement stock not available for this product");
-      error.statusCode = 400;
-      throw error;
+    try {
+      const [resolved] = await resolveOrderItems(
+        prisma as unknown as Prisma.TransactionClient,
+        [{ productId: data.exchangeProductId, variantId: data.exchangeVariantId, quantity: data.quantity }],
+      );
+      const stock = resolved.variantId
+        ? (await prisma.productVariant.findUnique({ where: { id: resolved.variantId }, select: { stock: true } }))?.stock
+        : (await prisma.product.findUnique({ where: { id: resolved.productId }, select: { stock: true } }))?.stock;
+      if ((stock ?? 0) < data.quantity) fail("Exchange item is out of stock");
+    } catch (e: any) {
+      e.statusCode = e.statusCode ?? 400; // resolveOrderItems plain Error throw karta hai
+      throw e;
     }
   }
-}
 
   const created = await prisma.returnRequest.create({
     data: {
@@ -167,21 +110,18 @@ export async function createReturnRequest(
       type: data.type,
       reason: data.reason,
       reasonNote: data.reasonNote,
-      // string[] aaya hai input mein — DB mein Product/Variant jaisa hi JSON string bana ke store
       images:
-        data.images && data.images.length > 0
-          ? JSON.stringify(data.images)
-          : null,
+        data.images && data.images.length > 0 ? JSON.stringify(data.images) : null,
       quantity: data.quantity,
       status: ReturnStatus.REQUESTED,
-      exchangeVariantId:
-        data.type === ReturnType.EXCHANGE ? data.exchangeVariantId : null,
+      exchangeProductId: isExchange ? data.exchangeProductId : null,
+      exchangeVariantId: isExchange ? data.exchangeVariantId : null,
     },
   });
 
   return withFullImageUrls(created);
 }
-// ==================== LIST OWN RETURNS ====================
+// ==================== LIST OWN RETURNS ====================exchangeProduct: { select: { id: true, name: true, images: true } }
 export async function listMyReturns(customerId: string) {
   const results = await prisma.returnRequest.findMany({
     where: { customerId },
@@ -196,6 +136,7 @@ export async function listMyReturns(customerId: string) {
       exchangeVariant: {
         select: { id: true, name: true, price: true, images: true },
       },
+      exchangeProduct: { select: { id: true, name: true, images: true } },
       refund: true,
     },
     orderBy: { createdAt: "desc" },

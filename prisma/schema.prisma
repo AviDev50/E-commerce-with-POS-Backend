@@ -86,6 +86,19 @@ enum Gender {
   OTHER
 }
 
+enum ExchangeSettlement {
+  NONE
+  COLLECT_AT_COUNTER
+  COLLECT_ON_DELIVERY
+  REFUND_AT_COUNTER
+  WALLET_CREDIT
+}
+
+enum WalletTxnType {
+  CREDIT
+  DEBIT
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -128,6 +141,7 @@ model Customer {
   returnRequests ReturnRequest[]
   supportTickets SupportTicket[]
   heldOrders HeldOrder[]
+  wallet Wallet?
 
   @@map("customers")
 }
@@ -196,7 +210,8 @@ model Product {
   orderItems        OrderItem[]
   reviews           Review[]
   cartItems         CartItem[]
-    wishlistItems WishlistItem[]
+  wishlistItems WishlistItem[]
+  exchangeRequests ReturnRequest[] @relation("ExchangeProduct")
 
   @@map("products")
 }
@@ -284,9 +299,11 @@ model Order {
   orderItems  OrderItem[]
   payments    Payment[]
   refunds     Refund[]
+  walletTransactions WalletTransaction[]
   exchangeReturnRequests ReturnRequest[] @relation("ExchangeOrder")
-    shift       Shift?   @relation(fields: [shiftId], references: [id])
-    gatewayOrderId String? @unique   // Razorpay ka razorpay_order_id — idempotency ke liye
+  shift       Shift?   @relation(fields: [shiftId], references: [id])
+  gatewayOrderId String? @unique   // Razorpay ka razorpay_order_id — idempotency ke liye
+  isExchange Boolean @default(false)
 
   @@map("orders")
 }
@@ -337,21 +354,24 @@ model Refund {
   returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id])
 
   @@map("refunds")
 }
 
 model StoreSettings {
   id           String   @id @default(uuid())
-  businessName String
+  businessName String   
   logoUrl      String?
   email        String?
   phone        String?
   address      String?
   state        String?
-   country      String?
+  country      String?
   currency     String   @default("INR")
   updatedAt    DateTime @updatedAt
+  returnWindowDays Int @default(7)
 
   @@map("store_settings")
 }
@@ -536,6 +556,13 @@ model ReturnRequest {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  exchangeProductId String?
+exchangeProduct   Product? @relation("ExchangeProduct", fields: [exchangeProductId], references: [id])
+originalValue     Decimal? @db.Decimal(10, 2)
+newValue          Decimal? @db.Decimal(10, 2)
+priceDiff         Decimal? @db.Decimal(10, 2)
+settlement        ExchangeSettlement?
+walletTransaction WalletTransaction?
 
   @@map("return_requests")
 }
@@ -597,6 +624,7 @@ model Shift {
   closedAt        DateTime?
 
   orders          Order[]
+  refunds Refund[]
   
 
   @@map("shifts")
@@ -621,4 +649,32 @@ model HeldOrder {
   resumedAt  DateTime?
 
   @@map("held_orders")
+}
+
+model Wallet {
+  id           String              @id @default(uuid())
+  customerId   String              @unique
+  customer     Customer            @relation(fields: [customerId], references: [id])
+  balance      Decimal             @default(0) @db.Decimal(10, 2)
+  updatedAt    DateTime            @updatedAt
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id              String         @id @default(uuid())
+  walletId        String
+  wallet          Wallet         @relation(fields: [walletId], references: [id])
+  type            WalletTxnType
+  amount          Decimal        @db.Decimal(10, 2)
+  balanceAfter    Decimal        @db.Decimal(10, 2)
+  reason          String
+  returnRequestId String?        @unique // ek request se sirf ek credit, double credit nahi
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
+  createdAt       DateTime       @default(now())
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  @@map("wallet_transactions")
 }

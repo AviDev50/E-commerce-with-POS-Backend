@@ -105,8 +105,8 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "review:moderate": [Role.ADMIN, Role.MANAGER],
   "review:delete": [Role.ADMIN, Role.MANAGER],
   "return:view": [Role.ADMIN, Role.MANAGER],
-  "return:manage": [Role.ADMIN, Role.MANAGER],
-  "dashboard:view": [Role.ADMIN, Role.MANAGER],
+  "return:manage": [Role.ADMIN, Role.MANAGER],                 //admin panel is same for pos and e-commerce 
+  "dashboard:view": [Role.ADMIN, Role.MANAGER],                //this works for admin panel dashboard for both manager and admin
   "customer:create": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "customer:search": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
   "staff:view": [Role.ADMIN],
@@ -116,7 +116,7 @@ const defaultRoleMapping: Record<string, Role[]> = {
   "page:read": [Role.ADMIN],
   "page:update": [Role.ADMIN],
   "product:view:pos": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
-  "report:sales:view": [Role.ADMIN, Role.MANAGER, Role.CASHIER],
+  "report:sales:view": [Role.ADMIN, Role.MANAGER, Role.CASHIER], //this works as dashboard of pos for all admin/manager/cashier
   "shift:manage": [Role.ADMIN, Role.CASHIER, Role.MANAGER],
   "shift:view:all": [Role.ADMIN],
   "order:hold": [Role.ADMIN, Role.MANAGER, Role.CASHIER],

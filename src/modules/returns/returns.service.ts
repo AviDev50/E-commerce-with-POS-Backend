@@ -4,11 +4,17 @@ import {
   ReturnType,
   OrderStatus,
   PaymentStatus,
-  PaymentMethod,
   RefundStatus,
   OrderChannel,
+  Prisma, 
+  PaymentMethod, 
+  ExchangeSettlement
 } from "@prisma/client";
+import { fail } from "../../utils/fail.js";
 import { formatReturnResponse } from "../../utils/returnFormat.js";
+import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
+import { creditWalletTx } from "../wallet/wallet.service.js";
+import { paidValueForUnits, quoteExchange, deductStock } from "../order/order.service.js";
 
 // Explicit ReturnStatus[] typing — warna TS inline array literal ko
 // narrow ("REQUESTED"|"APPROVED")[] type de deta hai aur .includes() mismatch deta hai
@@ -192,198 +198,142 @@ export async function markReceived(id: string) {
 
 // ==================== PROCESS REFUND (type = RETURN, COD manual) ====================
 export async function processRefund(id: string, adminId: string) {
-  const existing = await prisma.returnRequest.findUnique({
-    where: { id },
-    include: { orderItem: true, refund: true },
-  });
-
-  if (!existing) {
-    const error: any = new Error("Return request not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (existing.type !== ReturnType.RETURN) {
-    const error: any = new Error("This is an exchange request, use the exchange endpoint");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (existing.status !== ReturnStatus.RECEIVED) {
-    const error: any = new Error("Item must be received before refund can be processed");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (existing.refund) {
-    const error: any = new Error("Refund already processed for this return");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const { orderItem } = existing;
-  const perUnitTotal = (Number(orderItem.subtotal) + Number(orderItem.taxAmount)) / orderItem.quantity;
-  const refundAmount = Number((perUnitTotal * existing.quantity).toFixed(2));
-
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.returnRequest.findUnique({
+      where: { id },
+      include: { orderItem: { include: { order: true } }, refund: true },
+    });
+    if (!existing) return fail("Return request not found", 404);
+    if (existing.type !== ReturnType.RETURN) return fail("This is an exchange request, use the exchange endpoint");
+    if (existing.status !== ReturnStatus.RECEIVED) return fail("Item must be received before refund can be processed");
+    if (existing.refund) return fail("Refund already processed for this return");
+
+    const { orderItem } = existing;
+    const amount = paidValueForUnits(orderItem, orderItem.order, existing.quantity);
+
     const refund = await tx.refund.create({
       data: {
         orderId: orderItem.orderId,
-        amount: refundAmount,
+        amount,
+        method: PaymentMethod.WALLET,
         reason: existing.reason,
-        status: RefundStatus.COMPLETED, // COD hai — actual cash/transfer admin manually karta hai bahar
+        status: RefundStatus.COMPLETED,
         processedById: adminId,
         returnRequestId: existing.id,
       },
     });
-
-    await tx.returnRequest.update({ where: { id }, data: { status: ReturnStatus.REFUNDED } });
-
+    await creditWalletTx(tx, {
+      customerId: existing.customerId,
+      amount,
+      reason: `Return refund (${orderItem.order.orderNumber})`,
+      returnRequestId: existing.id,
+    });
+    await tx.returnRequest.update({
+      where: { id },
+      data: { status: ReturnStatus.REFUNDED, originalValue: amount, settlement: ExchangeSettlement.WALLET_CREDIT },
+    });
     return refund;
   });
 }
 
 // ==================== PROCESS EXCHANGE (type = EXCHANGE) ====================
 export async function processExchange(id: string, adminId: string) {
-  const existing = await prisma.returnRequest.findUnique({
-    where: { id },
-    include: { orderItem: { include: { order: true, product: true } } },
-  });
-
-  if (!existing) {
-    const error: any = new Error("Return request not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (existing.type !== ReturnType.EXCHANGE) {
-    const error: any = new Error("This is a return request, use the refund endpoint");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (existing.status !== ReturnStatus.RECEIVED) {
-    const error: any = new Error("Item must be received before exchange can be processed");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const { orderItem } = existing;
-
-  // ===== CASE 1: Variant exchange (size/color) =====
-  if (existing.exchangeVariantId) {
-    const newVariant = await prisma.productVariant.findUnique({ where: { id: existing.exchangeVariantId } });
-    if (!newVariant) {
-      const error: any = new Error("Exchange variant not found");
-      error.statusCode = 404;
-      throw error;
-    }
-    if (newVariant.stock < existing.quantity) {
-      const error: any = new Error("Exchange variant is out of stock");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const priceDiffPerUnit = Number(newVariant.price) - Number(orderItem.price);
-    const totalPriceDiff = Number((priceDiffPerUnit * existing.quantity).toFixed(2));
-    const subtotal = Number((Number(newVariant.price) * existing.quantity).toFixed(2));
-
-    return prisma.$transaction(async (tx) => {
-      await tx.productVariant.update({
-        where: { id: newVariant.id },
-        data: { stock: { decrement: existing.quantity } },
-      });
-
-      const exchangeOrder = await tx.order.create({
-        data: {
-          orderNumber: `EXC-${Date.now()}`,
-          channel: OrderChannel.ONLINE,
-          status: OrderStatus.PROCESSING,
-          customerId: existing.customerId,
-          addressId: orderItem.order.addressId,
-          subtotal,
-          tax: 0,
-          discount: 0,
-          total: subtotal,
-          orderItems: {
-            create: {
-              productId: newVariant.productId,
-              variantId: newVariant.id,
-              quantity: existing.quantity,
-              price: newVariant.price,
-              subtotal,
-            },
-          },
-          // FIX: "payment: { create: {...} }" → "payments: { create: [{...}] }"
-          payments: {
-            create: [
-              {
-                method: PaymentMethod.COD,
-                status: totalPriceDiff > 0 ? PaymentStatus.PENDING : PaymentStatus.PAID,
-                amount: totalPriceDiff > 0 ? totalPriceDiff : 0,
-              },
-            ],
-          },
-        },
-      });
-      await tx.returnRequest.update({
-        where: { id },
-        data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id, approvedById: adminId },
-      });
-
-      return exchangeOrder;
-    });
-  }
-
-// ===== CASE 2: Simple product replacement (same product, defect exchange) =====
-  if (orderItem.product.stock < existing.quantity) {
-    const error: any = new Error("Replacement stock not available for this product");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const subtotal = Number((Number(orderItem.price) * existing.quantity).toFixed(2));
-
   return prisma.$transaction(async (tx) => {
-    await tx.product.update({
-      where: { id: orderItem.productId },
-      data: { stock: { decrement: existing.quantity } },
+    const existing = await tx.returnRequest.findUnique({
+      where: { id },
+      include: { orderItem: { include: { order: { include: { address: true } } } } },
     });
+    if (!existing) return fail("Return request not found", 404);
+    if (existing.type !== ReturnType.EXCHANGE) return fail("This is a return request, use the refund endpoint");
+    if (existing.status !== ReturnStatus.RECEIVED) return fail("Item must be received before exchange can be processed");
+
+    const { orderItem } = existing;
+    const order = orderItem.order;
+    const address = order.address ?? fail("Order has no shipping address");
+    const settings = await tx.storeSettings.findFirst();
+
+    const quote = await quoteExchange(tx, {
+      originalItem: orderItem,
+      order,
+      quantity: existing.quantity,
+      newProductId: existing.exchangeProductId ?? orderItem.productId, // purani requests: same product
+      newVariantId: existing.exchangeVariantId ?? undefined,
+      dest: { country: address.country, state: address.state },
+      origin: { country: settings?.country ?? null, state: settings?.state ?? null },
+    });
+    await deductStock(tx, quote.resolvedNewItems);
+
+    const { priceDiff } = quote;
+    const orderNumber = await generateOrderNumber(tx);
 
     const exchangeOrder = await tx.order.create({
       data: {
-        orderNumber: `EXC-${Date.now()}`,
+        orderNumber,
         channel: OrderChannel.ONLINE,
         status: OrderStatus.PROCESSING,
+        isExchange: true,
         customerId: existing.customerId,
-        addressId: orderItem.order.addressId,
-        subtotal,
-        tax: 0,
+        addressId: order.addressId,
+        subtotal: quote.newSubtotal,
+        tax: quote.newTax,
         discount: 0,
-        total: subtotal,
+        total: quote.newItemTotal,
         orderItems: {
-          create: {
-            productId: orderItem.productId,
-            quantity: existing.quantity,
-            price: orderItem.price,
-            subtotal,
-          },
+          create: quote.itemsWithTax.map((i) => ({
+            productId: i.productId,
+            variantId: i.variantId,
+            quantity: i.quantity,
+            price: i.price,
+            subtotal: i.subtotal,
+            taxAmount: i.taxAmount,
+            taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
+          })),
         },
-        payments: {
-          create: [
-            {
-              method: PaymentMethod.COD,
-              status: PaymentStatus.PAID, // same price hai, price-diff ka sawaal nahi
-              amount: 0,
-            },
-          ],
-        },
+        // mehenga item: diff delivery par COD se
+        payments:
+          priceDiff > 0
+            ? { create: [{ method: PaymentMethod.COD, status: PaymentStatus.PENDING, amount: priceDiff }] }
+            : undefined,
       },
     });
 
+    let settlement: ExchangeSettlement = ExchangeSettlement.NONE;
+    if (priceDiff > 0) settlement = ExchangeSettlement.COLLECT_ON_DELIVERY;
+
+    // sasta item: bacha hua paisa wallet mein
+    if (priceDiff < 0) {
+      const amount = Math.abs(priceDiff);
+      await tx.refund.create({
+        data: {
+          orderId: orderItem.orderId,
+          amount,
+          method: PaymentMethod.WALLET,
+          reason: `Exchange price difference credited to wallet (${orderNumber})`,
+          status: RefundStatus.COMPLETED,
+          processedById: adminId,
+          returnRequestId: id,
+        },
+      });
+      await creditWalletTx(tx, {
+        customerId: existing.customerId,
+        amount,
+        reason: `Exchange difference (${orderNumber})`,
+        returnRequestId: id,
+      });
+      settlement = ExchangeSettlement.WALLET_CREDIT;
+    }
+
     await tx.returnRequest.update({
       where: { id },
-      data: { status: ReturnStatus.EXCHANGED, exchangeOrderId: exchangeOrder.id, approvedById: adminId },
+      data: {
+        status: ReturnStatus.EXCHANGED,
+        exchangeOrderId: exchangeOrder.id,
+        approvedById: adminId,
+        originalValue: quote.originalValue,
+        newValue: quote.newItemTotal,
+        priceDiff,
+        settlement,
+      },
     });
 
     return exchangeOrder;

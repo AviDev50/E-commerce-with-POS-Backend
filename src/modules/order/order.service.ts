@@ -1,10 +1,12 @@
 import prisma from "../../config/db.js";
-import { Prisma, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { Prisma, PaymentMethod, PaymentStatus, OrderStatus, OrderItem, Order, ExchangeSettlement } from "@prisma/client";
+import { fail } from "../../utils/fail.js";
 import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { computeCouponDiscount } from "../../utils/couponValidator.js";
 import { formatImageUrl } from "../../utils/formatImageUrl.js";
-import { OrderStatus } from "@prisma/client";
+import { DEFAULT_RETURN_WINDOW_DAYS, PENDING_RETURN_STATUSES } from "../../utils/returnPolicy.js";
+import { creditWalletTx, debitWalletTx } from "../wallet/wallet.service.js";
 
 interface OrderItemInput {
   productId: string;
@@ -44,7 +46,7 @@ interface PreviewOrderInput {
   customerId: string;
 }
 
-interface ResolvedItem {
+export interface ResolvedItem {
   productId: string;
   productName: string;
   variantId?: string;
@@ -60,6 +62,7 @@ interface InstantExchangeInput {
   newVariantId?: string;
   payments?: PaymentInput[]; // agar naya item mehenga hai — customer se extra liya
   refundMethod?: PaymentMethod; // agar naya item sasta hai — customer ko wapas diya
+  reason?: string; // add
   createdById: string;
 }
 
@@ -95,7 +98,7 @@ async function resolvePosCustomer(
   return customer;
 }
 
-async function resolveOrderItems(
+export async function resolveOrderItems(
   tx: Prisma.TransactionClient,
   items: OrderItemInput[],
 ): Promise<ResolvedItem[]> {
@@ -121,7 +124,7 @@ async function resolveOrderItems(
       const variant = await tx.productVariant.findUnique({
         where: { id: item.variantId },
       });
-      if (!variant || variant.productId !== item.productId) {
+     if (!variant || variant.productId !== item.productId || !variant.isActive) { 
         throw new Error(`Variant not found for product: ${product.name}`);
       }
       price = Number(variant.price);
@@ -159,7 +162,7 @@ async function resolveOrderItems(
 }
 
 // Atomic check-and-decrement — race condition safe (row-lock via conditional UPDATE)
-async function deductStock(
+export async function deductStock(
   tx: Prisma.TransactionClient,
   items: ResolvedItem[],
 ) {
@@ -326,6 +329,16 @@ export async function createConfirmedOrderService(input: CreateConfirmedOrderInp
         include: { orderItems: true, payments: true },
       });
 
+      if (input.payment.method === PaymentMethod.WALLET) {
+  // balance kam hua to poori transaction rollback: stock, coupon, order sab wapas
+  await debitWalletTx(tx, {
+    customerId: input.customerId,
+    amount: Number(total.toFixed(2)),
+    reason: `Order ${orderNumber}`,
+    orderId: order.id,
+  });
+}
+
       if (input.cartItemIds && input.cartItemIds.length > 0) {
         await tx.cartItem.deleteMany({
           where: { id: { in: input.cartItemIds }, cart: { customerId: input.customerId } },
@@ -349,7 +362,7 @@ export async function createConfirmedOrderService(input: CreateConfirmedOrderInp
   }
 }
 
-async function buildItemsWithTax(
+export async function buildItemsWithTax(
   tx: Prisma.TransactionClient,
   items: ResolvedItem[],
   destCountry: string,
@@ -495,8 +508,8 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
 
 // ==================== ONLINE ORDER ====================
 export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
-  if (data.paymentMethod !== "COD") {
-    throw new Error("Only COD payment is supported at the moment");
+  if (data.paymentMethod !== "COD" && data.paymentMethod !== "WALLET") {
+    throw new Error("Only COD and WALLET payments are supported at the moment");
   }
 
   return createConfirmedOrderService({
@@ -504,7 +517,10 @@ export async function createOnlineOrderService(data: CreateOnlineOrderInput) {
     addressId: data.addressId,
     couponCode: data.couponCode,
     items: data.items,
-    payment: { method: "COD", status: "PENDING" },
+    payment:
+      data.paymentMethod === "WALLET"
+        ? { method: "WALLET", status: "PAID" }
+        : { method: "COD", status: "PENDING" },
     status: "PENDING",
     cartItemIds: data.cartItemIds,
   });
@@ -603,6 +619,12 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
     inStock: itemsWithDetails[idx].inStock,
   }));
 
+const wallet = await prisma.wallet.findUnique({
+  where: { customerId: data.customerId },
+  select: { balance: true },
+});
+const walletBalance = Number(wallet?.balance ?? 0);
+
   return {
     items: summaryItems,
     subtotal,
@@ -612,6 +634,8 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
     couponApplied:
       data.couponCode && !couponError ? data.couponCode.toUpperCase() : null,
     couponError: couponError ?? null,
+    walletBalance,
+    walletSufficient: walletBalance >= Number(total.toFixed(2)),
   };
 }
 
@@ -732,29 +756,37 @@ export async function refundOrderService(
       throw new Error("Order is already refunded");
     }
 
-    await restoreStock(tx, order.orderItems);
+    if (order.isExchange) fail("Exchange orders cannot be refunded directly");
 
-    await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
+const walletPaid = order.payments
+  .filter((p) => p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID)
+  .reduce((s, p) => s + Number(p.amount), 0);
 
-    // FIX: pehle sirf ek "order.payment" tha, ab "order.payments" array hai
-    // (split payment ki wajah se ek order ke multiple Payment records ho sakte hain) —
-    // isliye updateMany se orderId ke sabhi payments ko ek saath REFUNDED mark kar rahe hain
-    if (order.payments.length > 0) {
-      await tx.payment.updateMany({
-        where: { orderId: id },
-        data: { status: "REFUNDED" },
-      });
-    }
+let method: PaymentMethod | undefined;
+if (walletPaid > 0) {
+  if (!order.customerId) fail("Order has no customer");
+  if (amount > walletPaid) fail(`Refund amount exceeds wallet-paid amount (${walletPaid})`);
+  method = PaymentMethod.WALLET;
+}
 
-    return tx.refund.create({
-      data: {
-        orderId: id,
-        amount,
-        reason,
-        status: "COMPLETED",
-        processedById,
-      },
-    });
+await restoreStock(tx, order.orderItems);
+await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
+if (order.payments.length > 0) {
+  await tx.payment.updateMany({ where: { orderId: id }, data: { status: "REFUNDED" } });
+}
+
+const refund = await tx.refund.create({
+  data: { orderId: id, amount, method, reason, status: "COMPLETED", processedById },
+});
+if (method === PaymentMethod.WALLET) {
+  await creditWalletTx(tx, {
+    customerId: order.customerId!,
+    amount,
+    reason: `Order refund (${order.orderNumber})`,
+    orderId: id,
+  });
+}
+return refund;
   });
 }
 
@@ -772,6 +804,7 @@ export async function cancelOrderService(
     if (!order || order.customerId !== customerId) {
       throw new Error("Order not found");
     }
+    if (order.isExchange) fail("Exchange orders cannot be cancelled/refunded directly");
 
     if (
       order.status === "CANCELLED" ||
@@ -785,24 +818,42 @@ export async function cancelOrderService(
 
     await restoreStock(tx, order.orderItems);
 
-    await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
+   if (order.isExchange) fail("Exchange orders cannot be cancelled directly");
 
-    // FIX: yahan bhi sabhi payments ko FAILED mark karo (split payment case)
-    if (order.payments.length > 0) {
-      await tx.payment.updateMany({
-        where: { orderId: id },
-        data: { status: "FAILED" },
-      });
-    }
+await restoreStock(tx, order.orderItems);
+await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
 
-    return tx.refund.create({
-      data: {
-        orderId: id,
-        amount: 0,
-        reason,
-        status: "COMPLETED",
-      },
-    });
+const walletPaid = order.payments
+  .filter((p) => p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID)
+  .reduce((s, p) => s + Number(p.amount), 0);
+
+await tx.payment.updateMany({
+  where: { orderId: id, status: { not: PaymentStatus.PAID } },
+  data: { status: PaymentStatus.FAILED },
+});
+await tx.payment.updateMany({
+  where: { orderId: id, method: PaymentMethod.WALLET, status: PaymentStatus.PAID },
+  data: { status: PaymentStatus.REFUNDED },
+});
+
+const refund = await tx.refund.create({
+  data: {
+    orderId: id,
+    amount: walletPaid,
+    method: walletPaid > 0 ? PaymentMethod.WALLET : undefined,
+    reason,
+    status: "COMPLETED",
+  },
+});
+if (walletPaid > 0) {
+  await creditWalletTx(tx, {
+    customerId,
+    amount: walletPaid,
+    reason: `Order cancelled (${order.orderNumber})`,
+    orderId: id,
+  });
+}
+return refund;
   });
 }
 
@@ -961,124 +1012,192 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
   };
 }
 
+//shared function 
+export function paidValueForUnits(
+  item: Pick<OrderItem, "subtotal" | "taxAmount" | "quantity">,
+  order: Pick<Order, "subtotal" | "discount">,
+  qty: number,
+): number {
+  const itemSubtotal = Number(item.subtotal);
+  const orderSubtotal = Number(order.subtotal);
+  const discountShare =
+    orderSubtotal > 0 ? (Number(order.discount) * itemSubtotal) / orderSubtotal : 0;
+  const lineTotal = itemSubtotal + Number(item.taxAmount) - discountShare;
+  return Number(((lineTotal / item.quantity) * qty).toFixed(2)); // paise-level rounding drift ho sakta hai
+}
+
+export async function quoteExchange(
+  tx: Prisma.TransactionClient,
+  p: {
+    originalItem: OrderItem;
+    order: Order;
+    quantity: number;
+    newProductId: string;
+    newVariantId?: string;
+    dest: { country: string; state: string };
+    origin: { country: string | null; state: string | null };
+  },
+) {
+  const resolvedNewItems = await resolveOrderItems(tx, [
+    { productId: p.newProductId, variantId: p.newVariantId, quantity: p.quantity },
+  ]);
+  const itemsWithTax = await buildItemsWithTax(
+    tx, resolvedNewItems, p.dest.country, p.dest.state, p.origin.country, p.origin.state,
+  );
+
+  const newSubtotal = Number(itemsWithTax.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
+  const newTax = Number(itemsWithTax.reduce((s, i) => s + i.taxAmount, 0).toFixed(2));
+  const newItemTotal = Number((newSubtotal + newTax).toFixed(2));
+  const originalValue = paidValueForUnits(p.originalItem, p.order, p.quantity);
+  const priceDiff = Number((newItemTotal - originalValue).toFixed(2)); // naye item par koi discount nahi
+
+  return { resolvedNewItems, itemsWithTax, newSubtotal, newTax, newItemTotal, originalValue, priceDiff };
+}
+
+//for pos eligibility check
+async function loadPosEligibleItem(
+  tx: Prisma.TransactionClient,
+  orderItemId: string,
+  quantity: number,
+) {
+  const item = await tx.orderItem.findUnique({
+    where: { id: orderItemId },
+    include: { order: true, product: { include: { category: true } } },
+  });
+  if (!item) return fail("Original order item not found", 404);
+  const order = item.order;
+
+  if (order.channel !== "POS") fail("Online orders cannot be exchanged at POS. Use the website return flow.");
+  if (order.status !== OrderStatus.COMPLETED) fail("Exchange is only allowed for completed orders");
+
+  const isReturnable =
+    item.product.isReturnable ?? item.product.category?.isReturnable ?? true;
+  if (!isReturnable) {
+    const policy = item.product.returnPolicyText ?? item.product.category?.returnPolicyText;
+    fail(`"${item.product.name}" is non-returnable.${policy ? ` Policy: ${policy}` : ""}`);
+  }
+
+  const settings = await tx.storeSettings.findFirst();
+  const windowDays = settings?.returnWindowDays ?? DEFAULT_RETURN_WINDOW_DAYS;
+  const windowEnd = new Date(order.createdAt);
+  windowEnd.setDate(windowEnd.getDate() + windowDays);
+  if (new Date() > windowEnd) fail(`Return window of ${windowDays} days has expired`);
+
+  const pending = await tx.returnRequest.aggregate({
+    where: { orderItemId, status: { in: PENDING_RETURN_STATUSES } },
+    _sum: { quantity: true },
+  });
+  const available = item.quantity - item.returnedQty - (pending._sum.quantity ?? 0);
+  if (!Number.isInteger(quantity) || quantity <= 0 || quantity > available) {
+    fail(`Invalid quantity — only ${available} unit(s) available to exchange`);
+  }
+
+  return { item, order, settings };
+}
+
+//for preview
+export async function previewPosExchangeService(data: {
+  orderItemId: string;
+  quantity: number;
+  newProductId: string;
+  newVariantId?: string;
+}) {
+  const tx = prisma as unknown as Prisma.TransactionClient;
+  const { item, order, settings } = await loadPosEligibleItem(tx, data.orderItemId, data.quantity);
+  const country = settings?.country ?? "India";
+  const state = settings?.state ?? "";
+
+  const q = await quoteExchange(tx, {
+    originalItem: item, order, quantity: data.quantity,
+    newProductId: data.newProductId, newVariantId: data.newVariantId,
+    dest: { country, state }, origin: { country, state },
+  });
+
+  const r = q.resolvedNewItems[0];
+  const stock = r.variantId
+    ? (await tx.productVariant.findUnique({ where: { id: r.variantId }, select: { stock: true } }))?.stock
+    : (await tx.product.findUnique({ where: { id: r.productId }, select: { stock: true } }))?.stock;
+
+  return {
+    originalValue: q.originalValue,
+    newItem: { productName: r.productName, subtotal: q.newSubtotal, tax: q.newTax, total: q.newItemTotal },
+    priceDiff: q.priceDiff,
+    amount: Math.abs(q.priceDiff),
+    action: q.priceDiff > 0 ? "COLLECT" : q.priceDiff < 0 ? "REFUND" : "NONE",
+    inStock: (stock ?? 0) >= data.quantity,
+  };
+}
+
 export async function instantPosExchangeService(data: InstantExchangeInput) {
   return prisma.$transaction(async (tx) => {
-    const originalItem = await tx.orderItem.findUnique({
-      where: { id: data.orderItemId },
-      include: { order: true, product: true, variant: true },
+    const activeShift = await tx.shift.findFirst({
+      where: { cashierId: data.createdById, status: "OPEN" },
     });
+    if (!activeShift) return fail("Please open a shift before processing an exchange");
 
-    if (!originalItem) {
-      const err: any = new Error("Original order item not found");
-      err.statusCode = 404;
-      throw err;
-    }
+    const { item, order, settings } = await loadPosEligibleItem(tx, data.orderItemId, data.quantity);
+    const customerId = order.customerId ?? fail("Original order has no customer");
 
-    const alreadyReturned = originalItem.returnedQty;
-    const availableToExchange = originalItem.quantity - alreadyReturned;
-    if (data.quantity <= 0 || data.quantity > availableToExchange) {
-      const err: any = new Error(
-        `Invalid quantity — only ${availableToExchange} unit(s) available to exchange`,
-      );
-      err.statusCode = 400;
-      throw err;
-    }
+    // concurrent exchange guard
+    const marked = await tx.orderItem.updateMany({
+      where: { id: item.id, returnedQty: item.returnedQty },
+      data: { returnedQty: { increment: data.quantity } },
+    });
+    if (marked.count === 0) return fail("This item was just updated by another request. Please retry.", 409);
 
-    // ---- Step 1: purane item ka stock restore karo ----
-    if (originalItem.variantId) {
+    // purane item ka stock wapas
+    if (item.variantId) {
       await tx.productVariant.update({
-        where: { id: originalItem.variantId },
+        where: { id: item.variantId },
         data: { stock: { increment: data.quantity } },
       });
     } else {
       await tx.product.update({
-        where: { id: originalItem.productId },
+        where: { id: item.productId },
         data: { stock: { increment: data.quantity } },
       });
     }
 
-    // returnedQty mark karo taaki dobara same quantity exchange na ho sake
-    await tx.orderItem.update({
-      where: { id: data.orderItemId },
-      data: { returnedQty: { increment: data.quantity } },
+    const country = settings?.country ?? "India";
+    const state = settings?.state ?? "";
+    const quote = await quoteExchange(tx, {
+      originalItem: item, order, quantity: data.quantity,
+      newProductId: data.newProductId, newVariantId: data.newVariantId,
+      dest: { country, state }, origin: { country, state },
     });
+    await deductStock(tx, quote.resolvedNewItems);
 
-    // ---- Step 2: naye item ka price/tax resolve + stock deduct karo ----
-    const resolvedNewItems = await resolveOrderItems(tx, [
-      { productId: data.newProductId, variantId: data.newVariantId, quantity: data.quantity },
-    ]);
-    await deductStock(tx, resolvedNewItems);
+    const { priceDiff } = quote;
+    let settlement: ExchangeSettlement = ExchangeSettlement.NONE;
 
-    const storeSettings = await tx.storeSettings.findFirst();
-    const storeCountry = storeSettings?.country ?? "India";
-    const storeState = storeSettings?.state ?? "";
-
-    const itemsWithTax = await buildItemsWithTax(
-      tx,
-      resolvedNewItems,
-      storeCountry,
-      storeState,
-      storeCountry,
-      storeState,
-    );
-
-    const newItemTotal = itemsWithTax.reduce(
-      (sum, i) => sum + i.subtotal + i.taxAmount,
-      0,
-    );
-
-    // ---- Step 3: original item ka refund-equivalent value nikaalo ----
-    const perUnitOriginalTotal =
-      (Number(originalItem.subtotal) + Number(originalItem.taxAmount)) / originalItem.quantity;
-    const originalItemTotal = Number((perUnitOriginalTotal * data.quantity).toFixed(2));
-
-    const priceDiff = Number((newItemTotal - originalItemTotal).toFixed(2));
-
-    // ---- Step 4: price-diff validate karo ----
     if (priceDiff > 0) {
-      // Naya item mehenga — customer se extra payment lena hai
-      if (!data.payments || data.payments.length === 0) {
-        const err: any = new Error(
-          `New item is costlier by ₹${priceDiff}. Payment is required.`,
-        );
-        err.statusCode = 400;
-        throw err;
+      if (!data.payments?.length) return fail(`New item is costlier by ₹${priceDiff}. Payment is required.`);
+      const paid = data.payments.reduce((s, p) => s + p.amount, 0);
+      if (Math.round(paid * 100) !== Math.round(priceDiff * 100)) {
+        return fail(`Payment amount (${paid}) does not match price difference (${priceDiff})`);
       }
-      const paymentsTotal = data.payments.reduce((sum, p) => sum + p.amount, 0);
-      if (Math.round(paymentsTotal * 100) !== Math.round(priceDiff * 100)) {
-        const err: any = new Error(
-          `Payment amount (${paymentsTotal}) does not match price difference (${priceDiff})`,
-        );
-        err.statusCode = 400;
-        throw err;
-      }
-    } else if (priceDiff < 0) {
-      // Naya item sasta — customer ko wapas dena hai
-      if (!data.refundMethod) {
-        const err: any = new Error(
-          `New item is cheaper by ₹${Math.abs(priceDiff)}. refundMethod is required.`,
-        );
-        err.statusCode = 400;
-        throw err;
-      }
+      settlement = ExchangeSettlement.COLLECT_AT_COUNTER;
+    } else {
+      if (data.payments?.length) return fail("No payment is expected for this exchange");
+      if (priceDiff < 0) settlement = ExchangeSettlement.REFUND_AT_COUNTER;
     }
 
-    // ---- Step 5: naya POS exchange-order create karo (turant COMPLETED) ----
     const orderNumber = await generateOrderNumber(tx);
-
     const exchangeOrder = await tx.order.create({
       data: {
         orderNumber,
         channel: "POS",
         status: "COMPLETED",
-        customerId: originalItem.order.customerId, // walk-in ho to null hi carry-forward hoga
+        isExchange: true,
+        customerId,
         createdById: data.createdById,
-        subtotal: itemsWithTax.reduce((sum, i) => sum + i.subtotal, 0),
-        tax: itemsWithTax.reduce((sum, i) => sum + i.taxAmount, 0),
+        shiftId: activeShift.id,
+        subtotal: quote.newSubtotal,
+        tax: quote.newTax,
         discount: 0,
-        total: newItemTotal,
+        total: quote.newItemTotal,
         orderItems: {
-          create: itemsWithTax.map((i) => ({
+          create: quote.itemsWithTax.map((i) => ({
             productId: i.productId,
             variantId: i.variantId,
             quantity: i.quantity,
@@ -1088,34 +1207,58 @@ export async function instantPosExchangeService(data: InstantExchangeInput) {
             taxBreakdown: i.taxBreakdown as unknown as Prisma.InputJsonValue,
           })),
         },
-        payments: priceDiff > 0 && data.payments
-          ? {
-              create: data.payments.map((p) => ({
-                method: p.method,
-                status: "PAID",
-                amount: p.amount,
-              })),
-            }
-          : undefined,
+        payments:
+          priceDiff > 0
+            ? {
+                create: data.payments!.map((p) => ({
+                  method: p.method,
+                  status: "PAID",
+                  amount: p.amount,
+                  transactionRef: p.transactionRef,
+                })),
+              }
+            : undefined,
       },
       include: { orderItems: true, payments: true },
     });
 
-    // ---- Step 6: agar refund dena tha, Refund record banao ----
+    // report ke liye ek hi record (website exchange ke saath same table)
+    const record = await tx.returnRequest.create({
+      data: {
+        orderItemId: item.id,
+        customerId,
+        type: "EXCHANGE",
+        reason: data.reason ?? "POS instant exchange",
+        quantity: data.quantity,
+        status: "EXCHANGED",
+        exchangeProductId: data.newProductId,
+        exchangeVariantId: data.newVariantId ?? null,
+        exchangeOrderId: exchangeOrder.id,
+        approvedById: data.createdById,
+        originalValue: quote.originalValue,
+        newValue: quote.newItemTotal,
+        priceDiff,
+        settlement,
+      },
+    });
+
     let refund = null;
     if (priceDiff < 0) {
       refund = await tx.refund.create({
         data: {
-          orderId: originalItem.orderId, // original order ke against refund
+          orderId: item.orderId,
           amount: Math.abs(priceDiff),
-          method: data.refundMethod,
+          method: data.refundMethod ?? "CASH", // counter se cash
           reason: "Instant POS exchange — price difference refund",
           status: "COMPLETED",
           processedById: data.createdById,
+          shiftId: activeShift.id,
+          returnRequestId: record.id,
         },
       });
     }
 
-    return { exchangeOrder, refund, priceDiff };
+    return { exchangeOrder, refund, priceDiff, returnRequestId: record.id };
   });
 }
+

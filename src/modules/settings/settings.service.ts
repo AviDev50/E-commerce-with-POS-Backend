@@ -7,7 +7,9 @@ interface UpsertSettingsInput {
   phone?: string;
   address?: string;
   state?: string;
+  country?: string;
   currency?: string;
+  returnWindowDays?: number;
 }
 
 export async function getStoreSettingsService() {

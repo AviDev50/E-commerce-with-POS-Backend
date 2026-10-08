@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as razorpayController from "./razorpay.controller.js";
-import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js"; // ⚠️ apna actual path daalo
+import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js";
 
 const router = Router();
 
@@ -14,6 +14,6 @@ router.post(
   verifyCustomerToken,
   razorpayController.verifyRazorpayPayment,
 );
-router.post("/webhook", razorpayController.razorpayWebhook); // ⚠️ public — Razorpay khud call karega, koi customer token nahi hoga
+router.post("/webhook", razorpayController.razorpayWebhook); // public — Razorpay khud call karega, koi customer token nahi hoga
 
 export default router;
