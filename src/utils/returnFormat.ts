@@ -21,3 +21,6 @@ export function formatReturnResponse(r: any) {
     exchangeVariant: r.exchangeVariant ? withFullImageUrls(r.exchangeVariant) : r.exchangeVariant,
   };
 }
+
+
+

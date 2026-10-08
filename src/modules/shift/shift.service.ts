@@ -75,17 +75,20 @@ export async function closeShiftService(data: CloseShiftInput) {
 
   // Is shift ke dauraan diye gaye refunds — sirf CASH-paid orders ke against
   // (agar CARD se pay kiya tha aur refund hua, wo drawer ka cash nahi hai)
-  const cashRefundOrders = await prisma.refund.findMany({
-    where: {
-      order: {
-        shiftId: data.shiftId,
-        payments: { some: { method: "CASH" } },
+ const cashRefunds = await prisma.refund.findMany({
+  where: {
+    OR: [
+      { shiftId: data.shiftId, method: "CASH" },
+      {
+        shiftId: null,
+        method: null,
+        order: { shiftId: data.shiftId, payments: { some: { method: "CASH" } } },
       },
-    },
-    select: { amount: true },
-  });
-  const totalCashRefunds = cashRefundOrders.reduce((sum, r) => sum + Number(r.amount), 0);
-
+    ],
+  },
+  select: { amount: true },
+});
+const totalCashRefunds = cashRefunds.reduce((sum, r) => sum + Number(r.amount), 0);
   const expectedCash =
     Number(shift.openingCash) + totalCashSales - totalCashRefunds;
   const discrepancy = Number((data.closingCash - expectedCash).toFixed(2));

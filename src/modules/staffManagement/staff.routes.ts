@@ -9,6 +9,6 @@ router.get("/", verifyToken, checkPermission("staff:view"), staffController.list
 router.get("/:id", verifyToken, checkPermission("staff:view"), staffController.getStaffById);
 router.patch("/:id/deactivate", verifyToken, checkPermission("staff:manage"), staffController.deactivateStaff);
 router.patch("/:id/activate", verifyToken, checkPermission("staff:manage"), staffController.activateStaff);
-router.patch("/:id/role", verifyToken, checkPermission("staff:manage"), staffController.changeStaffRole);
+router.patch("/:id/role", verifyToken, checkPermission("staff:manage"), staffController.changeStaffRole);//currently not using in real admin panel
 
 export default router;

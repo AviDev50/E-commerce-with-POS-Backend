@@ -53,6 +53,13 @@ router.get(
 );
 
 router.post(
+  "/pos/exchange/preview",
+  verifyToken,
+  checkPermission("order:exchange:pos"),
+  orderController.previewPosExchange,
+);
+
+router.post(
   "/pos/exchange",
   verifyToken,
   checkPermission("order:exchange:pos"),
