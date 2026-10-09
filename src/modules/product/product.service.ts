@@ -183,27 +183,25 @@ export async function getAllProductsService(query: ProductListQuery) {
   };
 }
 
-export async function getProductByIdService(id: string) {
+export async function getProductByIdService(id: string, includeInactive = false) {
   const product = await prisma.product.findUnique({
     where: { id },
     include: {
       category: true,
       variants: {
+        where: includeInactive ? undefined : { isActive: true },
         include: {
           attributeValues: {
             include: { attributeValue: { include: { attribute: true } } },
           },
         },
       },
-      reviews: {
-        include: {
-          customer: { select: { id: true, name: true } },
-        },
-      },
+      reviews: { include: { customer: { select: { id: true, name: true } } } },
     },
   });
 
-  if (!product) {
+  // inactive product public ko direct URL se bhi nahi dikhna chahiye
+  if (!product || (!product.isActive && !includeInactive)) {
     throw new Error("Product not found");
   }
 
@@ -369,14 +367,14 @@ export async function createVariantService(
   };
 }
 
-export async function getVariantsByProductService(productId: string) {
+export async function getVariantsByProductService(productId: string, includeInactive = false) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product) {
+  if (!product || (!product.isActive && !includeInactive)) {
     throw new Error("Product not found");
   }
 
   const variants = await prisma.productVariant.findMany({
-    where: { productId },
+    where: { productId, ...(includeInactive ? {} : { isActive: true }) },
     include: {
       attributeValues: {
         include: { attributeValue: { include: { attribute: true } } },
@@ -578,6 +576,7 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
       price: true,
       stock: true,
       images: true,
+      _count: { select: { variants: true } },
       variants: {
         select: {
           id: true,
@@ -594,7 +593,7 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
 
   // in-memory: hasVariants + inStock resolve karo (websiteProduct module jaisa hi pattern)
   const withStockInfo = products.map((p) => {
-    const hasVariants = p.variants.length > 0;
+    const hasVariants = p._count.variants > 0;
     const inStock = hasVariants
       ? p.variants.some((v) => v.stock > 0)
       : p.stock > 0;
@@ -637,3 +636,41 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
+
+export async function setProductStatusService(id: string, isActive: boolean) {
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new Error("Product not found");
+
+  // variants ko touch nahi karte — reactivate par purani states wapas milengi
+  return prisma.product.update({
+    where: { id },
+    data: { isActive },
+    select: { id: true, name: true, isActive: true },
+  });
+}
+
+export async function setVariantStatusService(variantId: string, isActive: boolean) {
+  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+  if (!existing) throw new Error("Variant not found");
+
+  const variant = await prisma.productVariant.update({
+    where: { id: variantId },
+    data: { isActive },
+    select: { id: true, name: true, isActive: true, productId: true },
+  });
+
+  let warning: string | undefined;
+  if (!isActive) {
+    const activeCount = await prisma.productVariant.count({
+      where: { productId: existing.productId, isActive: true },
+    });
+    if (activeCount === 0) {
+      warning = "This was the last active variant — the product has no purchasable variants now";
+    }
+  }
+
+  return { variant, warning };
+}
+
+
+// getProductByIdService we start from here

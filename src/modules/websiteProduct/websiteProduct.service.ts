@@ -1,8 +1,16 @@
-import prisma from "../../config/db.js"; // ⚠️ apna actual prisma import path daalo
+import prisma from "../../config/db.js";
 import { Prisma } from "@prisma/client";
-import { formatImageUrl } from "../../utils/formatImageUrl.js"; // ⚠️ apna actual path daalo
+import { formatImageUrl } from "../../utils/formatImageUrl.js";
 import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 //import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
+
+// Sellable = bina variants wala product, YA kam se kam 1 active variant wala
+const SELLABLE: Prisma.ProductWhereInput = {
+  OR: [
+    { variants: { none: {} } },
+    { variants: { some: { isActive: true } } },
+  ],
+};
 
 function parseImages(images: any): string[] {
   if (Array.isArray(images)) return images;
@@ -100,6 +108,7 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
   } = query;
 
   const where: Prisma.ProductWhereInput = { isActive: true };
+  const andFilters: Prisma.ProductWhereInput[] = [SELLABLE];
 
   if (category) {
     const categoryIds = await getCategoryAndDescendantIds(category);
@@ -116,22 +125,23 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
     ];
   }
 
-  if (attributes && Object.keys(attributes).length > 0) {
-    where.AND = Object.entries(attributes).map(([attrName, values]) => ({
+ if (attributes && Object.keys(attributes).length > 0) {
+  andFilters.push(
+    ...Object.entries(attributes).map(([attrName, values]) => ({
       variants: {
         some: {
+          isActive: true, // naya
           attributeValues: {
             some: {
-              attributeValue: {
-                attribute: { name: attrName },
-                value: { in: values },
-              },
+              attributeValue: { attribute: { name: attrName }, value: { in: values } },
             },
           },
         },
       },
-    }));
-  }
+    })),
+  );
+}
+where.AND = andFilters;
 
   const products = await prisma.product.findMany({
     where,
@@ -145,7 +155,7 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, mrp: true, stock: true } },
+     variants: { where: { isActive: true }, select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
   });
@@ -220,19 +230,16 @@ export async function getAllWebsiteProductsService(query: WebsiteProductQuery) {
 }
 
 export async function getWebsiteProductBySlugService(slug: string) {
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    include: {
-      category: {
-        select: { id: true, name: true, slug: true, taxClassId: true },
+const product = await prisma.product.findFirst({
+  where: { slug, isActive: true, AND: [SELLABLE] },
+  include: {
+    category: { select: { id: true, name: true, slug: true, taxClassId: true } },
+    variants: {
+      where: { isActive: true }, // naya
+      include: {
+        attributeValues: { include: { attributeValue: { include: { attribute: true } } } },
       },
-      variants: {
-        include: {
-          attributeValues: {
-            include: { attributeValue: { include: { attribute: true } } },
-          },
-        },
-      },
+    },
       reviews: {
         where: { isApproved: true },
         include: { customer: { select: { name: true } } },
@@ -254,7 +261,7 @@ export async function getWebsiteProductBySlugService(slug: string) {
     Number(product.price),
     product.mrp,
     product.variants.map((v) => ({ price: v.price, mrp: v.mrp })),
-  ); // ⬅️ replace purane displayPrice wale 3 lines ko isse
+  );
 
   const reviewCount = product.reviews.length;
   const avgRating =
@@ -273,8 +280,8 @@ export async function getWebsiteProductBySlugService(slug: string) {
       id: v.id,
       sku: v.sku,
       price: Number(v.price),
-      mrp: variantMrp, // ⬅️ naya
-      discountPercent: variantDiscountPercent, // ⬅️ naya
+      mrp: variantMrp, 
+      discountPercent: variantDiscountPercent,
       stock: v.stock,
       attributes: v.attributeValues.map((vav) => ({
         attributeName: vav.attributeValue.attribute.name,
@@ -299,8 +306,7 @@ export async function getWebsiteProductBySlugService(slug: string) {
         where: {
           categoryId: product.categoryId,
           isActive: true,
-          id: { not: product.id },
-        },
+          id: { not: product.id }, AND: [SELLABLE] },
         select: {
           id: true,
           name: true,
@@ -308,7 +314,7 @@ export async function getWebsiteProductBySlugService(slug: string) {
           images: true,
           price: true,
           mrp: true,
-          variants: { select: { price: true, mrp: true } },
+       variants: { where: { isActive: true }, select: { price: true, mrp: true } },
         },
         take: 6,
       })
@@ -320,15 +326,15 @@ export async function getWebsiteProductBySlugService(slug: string) {
       Number(p.price),
       p.mrp,
       p.variants,
-    ); // ⬅️ replace
+    );
     return {
       id: p.id,
       name: p.name,
       slug: p.slug,
       image: imgs.length > 0 ? formatImageUrl(imgs[0]) : null,
       displayPrice,
-      mrp, // ⬅️ naya
-      discountPercent, // ⬅️ naya
+      mrp,
+      discountPercent,
     };
   });
   const productImages = parseImages(product.images).map(formatImageUrl);
@@ -389,6 +395,7 @@ export async function getWebsiteProductFiltersService(categorySlug?: string) {
   const variantAttributeValues = await prisma.variantAttributeValue.findMany({
     where: {
       variant: {
+        isActive: true,
         product: {
           isActive: true,
           ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
@@ -419,12 +426,10 @@ export async function getWebsiteProductFiltersService(categorySlug?: string) {
 async function getTopSellingProductIds(limit: number, sinceDate?: Date) {
   const grouped = await prisma.orderItem.groupBy({
     by: ["productId"],
-    where: {
-      order: {
-        status: "COMPLETED", // sirf actually completed orders count honge
-        ...(sinceDate ? { createdAt: { gte: sinceDate } } : {}),
-      },
-    },
+  where: {
+  product: { isActive: true, AND: [SELLABLE] },
+  order: { status: "COMPLETED", ...(sinceDate ? { createdAt: { gte: sinceDate } } : {}) },
+},
     _sum: { quantity: true },
     orderBy: { _sum: { quantity: "desc" } },
     take: limit,
@@ -437,7 +442,7 @@ async function getProductCardsByIds(productIds: string[]) {
   if (productIds.length === 0) return [];
 
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, isActive: true },
+    where: { id: { in: productIds }, isActive: true,AND: [SELLABLE] },
     select: {
       id: true,
       name: true,
@@ -448,7 +453,7 @@ async function getProductCardsByIds(productIds: string[]) {
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, mrp: true, stock: true } },
+     variants: { where: { isActive: true }, select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
   });
@@ -518,7 +523,7 @@ export async function getTopRatedService(
 ) {
   const grouped = await prisma.review.groupBy({
     by: ["productId"],
-    where: { isApproved: true },
+  where: { isApproved: true, product: { isActive: true, AND: [SELLABLE] } },
     _avg: { rating: true },
     _count: { rating: true },
     having: { rating: { _count: { gte: minReviews } } },
@@ -588,6 +593,7 @@ export async function getRecommendedProductsService(
       categoryId: { in: topCategoryIds },
       isActive: true,
       id: { notIn: [...excludeProductIds] },
+      AND: [SELLABLE],
     },
     select: {
       id: true,
@@ -599,7 +605,7 @@ export async function getRecommendedProductsService(
       stock: true,
       createdAt: true,
       category: { select: { id: true, name: true, slug: true } },
-      variants: { select: { price: true, mrp: true, stock: true } },
+    variants: { where: { isActive: true }, select: { price: true, mrp: true, stock: true } },
       reviews: { where: { isApproved: true }, select: { rating: true } },
     },
     take: limit,
@@ -662,16 +668,26 @@ export async function getCategoryDealsService(): Promise<CategoryDeal[]> {
     SELECT c.id as categoryId, c.name as categoryName, c.slug as categorySlug,
            MAX(discounts.discount) as maxDiscount
     FROM (
+      -- bina variants wale products: product-level mrp/price
       SELECT p.categoryId, ROUND(((p.mrp - p.price) / p.mrp) * 100) as discount
       FROM products p
-      WHERE p.isActive = true AND p.mrp IS NOT NULL AND p.mrp > p.price AND p.categoryId IS NOT NULL
+      WHERE p.isActive = true
+        AND p.mrp IS NOT NULL AND p.mrp > p.price
+        AND p.categoryId IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM product_variants v WHERE v.productId = p.id
+        )
 
       UNION ALL
 
+      -- variants wale products: sirf ACTIVE variants ka discount
       SELECT p.categoryId, ROUND(((pv.mrp - pv.price) / pv.mrp) * 100) as discount
       FROM product_variants pv
       JOIN products p ON pv.productId = p.id
-      WHERE p.isActive = true AND pv.mrp IS NOT NULL AND pv.mrp > pv.price AND p.categoryId IS NOT NULL
+      WHERE p.isActive = true
+        AND pv.isActive = true
+        AND pv.mrp IS NOT NULL AND pv.mrp > pv.price
+        AND p.categoryId IS NOT NULL
     ) as discounts
     JOIN categories c ON c.id = discounts.categoryId
     GROUP BY c.id, c.name, c.slug

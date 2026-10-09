@@ -114,9 +114,12 @@ export async function resolveOrderItems(
       include: { category: true },
     });
 
-    if (!product || !product.isActive) {
-      throw new Error(`Product not found or inactive: ${item.productId}`);
-    }
+  if (!product) {
+  throw new Error("Product not found");
+}
+if (!product.isActive) {
+  throw new Error(`"${product.name}" is currently unavailable`);
+}
 
     let price: number;
 
@@ -124,9 +127,12 @@ export async function resolveOrderItems(
       const variant = await tx.productVariant.findUnique({
         where: { id: item.variantId },
       });
-     if (!variant || variant.productId !== item.productId || !variant.isActive) { 
-        throw new Error(`Variant not found for product: ${product.name}`);
-      }
+     if (!variant || variant.productId !== item.productId) {
+  throw new Error(`Variant not found for product: ${product.name}`);
+}
+if (!variant.isActive) {
+  throw new Error(`"${product.name} - ${variant.name}" is currently unavailable`);
+}
       price = Number(variant.price);
     } else {
       // NAYA: agar variantId nahi diya, check karo ki is product ke variants exist toh nahi karte.
@@ -815,8 +821,6 @@ export async function cancelOrderService(
         `Order cannot be cancelled — current status is ${order.status}`,
       );
     }
-
-    await restoreStock(tx, order.orderItems);
 
    if (order.isExchange) fail("Exchange orders cannot be cancelled directly");
 
