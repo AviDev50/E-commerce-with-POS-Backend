@@ -18,7 +18,7 @@ router.get(
 
 // Public — customer bhi dekh sakta hai
 router.get("/", optionalAuth, productController.getAllProducts);
-router.get("/:id/variants", productController.getVariantsByProduct);
+router.get("/:id/variants",optionalAuth, productController.getVariantsByProduct);
 router.get("/:id", productController.getProductById);
 
 // Protected — staff only
@@ -72,6 +72,22 @@ router.put(
   checkPermission("product:update"),
   upload.array("images", 5),
   productController.updateVariant,
+);
+
+// DELETE /:id aur DELETE /variants/:variantId — we are not using now
+
+router.patch(
+  "/:id/status",
+  verifyToken,
+  checkPermission("product:update"),
+  productController.setProductStatus,
+);
+
+router.patch(
+  "/variants/:variantId/status",
+  verifyToken,
+  checkPermission("product:update"),
+  productController.setVariantStatus,
 );
 
 export default router;

@@ -16,7 +16,8 @@ router.get(
 router.get(
   "/returns-exchanges",
   verifyToken,
-  checkPermission("report:returns:view"),
+  // checkPermission("report:returns:view"),
+  checkPermission("report:sales:view"),
   reportsController.getReturnsExchangeReport,
 );
 

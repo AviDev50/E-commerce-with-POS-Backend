@@ -1,6 +1,6 @@
 import { Router } from "express";
 import * as cartController from "./cart.controller.js";
-import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js"; // ⚠️ apna actual middleware naam/path daalo
+import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js";
 
 const router = Router();
 

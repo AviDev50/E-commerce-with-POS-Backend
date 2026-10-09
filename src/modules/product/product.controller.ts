@@ -62,17 +62,17 @@ export async function getAllProducts(req: Request, res: Response) {
   try {
     const { page, limit, categoryId, search, includeInactive } = req.query;
 
-    const canSeeInactive =
-      includeInactive === "true" &&
-      req.user &&
-      (req.user.role === "ADMIN" || req.user.role === "MANAGER");
+    // const canSeeInactive =
+    //   includeInactive === "true" &&
+    //   req.user &&
+    //   (req.user.role === "ADMIN" || req.user.role === "MANAGER");
 
     const result = await productService.getAllProductsService({
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       categoryId: categoryId as string | undefined,
       search: search as string | undefined,
-      includeInactive: Boolean(canSeeInactive),
+      includeInactive: Boolean(includeInactive),
     });
 
     return res
@@ -86,12 +86,13 @@ export async function getAllProducts(req: Request, res: Response) {
 export async function getProductById(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const product = await productService.getProductByIdService(id);
+    const product = await productService.getProductByIdService(id, canSeeInactive(req));
     return res.status(200).json({ data: product });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
   }
 }
+
 
 export async function updateProduct(req: Request, res: Response) {
   try {
@@ -192,8 +193,7 @@ export async function createVariant(req: Request, res: Response) {
 export async function getVariantsByProduct(req: Request, res: Response) {
   try {
     const productId = req.params.id as string;
-    const variants =
-      await productService.getVariantsByProductService(productId);
+    const variants = await productService.getVariantsByProductService(productId, canSeeInactive(req));
     return res.status(200).json({ data: variants });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
@@ -277,5 +277,59 @@ export async function getProductsForPos(req: Request, res: Response) {
       .json({ data: result.products, pagination: result.pagination });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
+  }
+}
+
+//helper
+
+function parseBool(v: unknown): boolean | undefined {
+  if (typeof v === "boolean") return v;
+  if (v === "true") return true;
+  if (v === "false") return false;
+  return undefined;
+}
+
+//helper
+
+function canSeeInactive(req: Request): boolean {
+  return (
+    req.query.includeInactive === "true" &&
+    !!req.user &&
+    (req.user.role === "ADMIN" || req.user.role === "MANAGER")
+  );
+}
+
+export async function setProductStatus(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const isActive = parseBool(req.body.isActive);
+    if (isActive === undefined) {
+      return res.status(400).json({ message: "isActive (boolean) is required" });
+    }
+    const product = await productService.setProductStatusService(id, isActive);
+    return res.status(200).json({
+      message: isActive ? "Product activated" : "Product deactivated",
+      data: product,
+    });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+}
+
+export async function setVariantStatus(req: Request, res: Response) {
+  try {
+    const variantId = req.params.variantId as string;
+    const isActive = parseBool(req.body.isActive);
+    if (isActive === undefined) {
+      return res.status(400).json({ message: "isActive (boolean) is required" });
+    }
+    const { variant, warning } = await productService.setVariantStatusService(variantId, isActive);
+    return res.status(200).json({
+      message: isActive ? "Variant activated" : "Variant deactivated",
+      data: variant,
+      ...(warning ? { warning } : {}),
+    });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
   }
 }
