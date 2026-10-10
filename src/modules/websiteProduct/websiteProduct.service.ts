@@ -4,7 +4,7 @@ import { formatImageUrl } from "../../utils/formatImageUrl.js";
 import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 //import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
 
-// Sellable = bina variants wala product, YA kam se kam 1 active variant wala
+//Helperbina variants wala product, YA kam se kam 1 active variant wala
 const SELLABLE: Prisma.ProductWhereInput = {
   OR: [
     { variants: { none: {} } },
