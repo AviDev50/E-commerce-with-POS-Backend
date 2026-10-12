@@ -12,9 +12,18 @@ enum Role {
   CASHIER
 }
 
+enum RefundDestination {
+  WALLET
+  UPI
+}
+
 enum OrderChannel {
   ONLINE
   POS
+}
+
+enum PayoutType {
+  UPI  
 }
 
 enum OrderStatus {
@@ -56,6 +65,7 @@ enum RefundStatus {
   APPROVED
   REJECTED
   COMPLETED
+  FAILED
 }
 
 enum TaxApplyWhen {
@@ -92,6 +102,7 @@ enum ExchangeSettlement {
   COLLECT_ON_DELIVERY
   REFUND_AT_COUNTER
   WALLET_CREDIT
+  UPI_TRANSFER
 }
 
 enum WalletTxnType {
@@ -140,6 +151,7 @@ model Customer {
   wishlistItems WishlistItem[]
   returnRequests ReturnRequest[]
   supportTickets SupportTicket[]
+  payoutMethods PayoutMethod[]
   heldOrders HeldOrder[]
   wallet Wallet?
 
@@ -356,8 +368,31 @@ model Refund {
   updatedAt     DateTime     @updatedAt
   shiftId String?
   shift   Shift?  @relation(fields: [shiftId], references: [id])
+  payoutMethodId String?
+payoutMethod   PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
+transactionRef String?   // UTR
+failureReason  String?
+paidAt         DateTime?
 
   @@map("refunds")
+}
+
+model PayoutMethod {
+  id         String     @id @default(uuid())
+  customerId String
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  type       PayoutType @default(UPI)
+  upiId      String
+  label      String?
+  isActive   Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  returnRequests ReturnRequest[]
+  refunds        Refund[]
+
+  @@unique([customerId, upiId])
+  @@map("payout_methods")
 }
 
 model StoreSettings {
@@ -563,6 +598,9 @@ newValue          Decimal? @db.Decimal(10, 2)
 priceDiff         Decimal? @db.Decimal(10, 2)
 settlement        ExchangeSettlement?
 walletTransaction WalletTransaction?
+refundTo       RefundDestination?
+payoutMethodId String?
+payoutMethod   PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
 
   @@map("return_requests")
 }
