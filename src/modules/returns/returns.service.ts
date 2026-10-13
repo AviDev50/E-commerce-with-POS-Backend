@@ -8,7 +8,8 @@ import {
   OrderChannel,
   Prisma, 
   PaymentMethod, 
-  ExchangeSettlement
+  ExchangeSettlement,
+  RefundDestination 
 } from "@prisma/client";
 import { fail } from "../../utils/fail.js";
 import { formatReturnResponse } from "../../utils/returnFormat.js";
@@ -72,6 +73,7 @@ export async function getReturnById(id: string) {
       exchangeVariant: true,
       exchangeOrder: true,
       refund: true,
+      payoutMethod: true,
     },
   });
 
@@ -211,6 +213,29 @@ export async function processRefund(id: string, adminId: string) {
     const { orderItem } = existing;
     const amount = paidValueForUnits(orderItem, orderItem.order, existing.quantity);
 
+    // UPI: refund PENDING banta hai, admin manually bhejta hai; request tab REFUNDED hogi jab payout COMPLETED ho
+    if (existing.refundTo === RefundDestination.UPI) {
+      if (!existing.payoutMethodId) return fail("Customer has not provided a payout method");
+      const refund = await tx.refund.create({
+        data: {
+          orderId: orderItem.orderId,
+          amount,
+          method: PaymentMethod.UPI,
+          reason: existing.reason,
+          status: RefundStatus.PENDING,
+          processedById: adminId,
+          returnRequestId: existing.id,
+          payoutMethodId: existing.payoutMethodId,
+        },
+      });
+      await tx.returnRequest.update({
+        where: { id },
+        data: { originalValue: amount, settlement: ExchangeSettlement.UPI_TRANSFER },
+      });
+      return refund;
+    }
+
+    // WALLET (aur purani requests jinme refundTo null hai)
     const refund = await tx.refund.create({
       data: {
         orderId: orderItem.orderId,
@@ -300,29 +325,45 @@ export async function processExchange(id: string, adminId: string) {
     let settlement: ExchangeSettlement = ExchangeSettlement.NONE;
     if (priceDiff > 0) settlement = ExchangeSettlement.COLLECT_ON_DELIVERY;
 
-    // sasta item: bacha hua paisa wallet mein
-    if (priceDiff < 0) {
-      const amount = Math.abs(priceDiff);
-      await tx.refund.create({
-        data: {
-          orderId: orderItem.orderId,
-          amount,
-          method: PaymentMethod.WALLET,
-          reason: `Exchange price difference credited to wallet (${orderNumber})`,
-          status: RefundStatus.COMPLETED,
-          processedById: adminId,
-          returnRequestId: id,
-        },
-      });
-      await creditWalletTx(tx, {
-        customerId: existing.customerId,
-        amount,
-        reason: `Exchange difference (${orderNumber})`,
-        returnRequestId: id,
-      });
-      settlement = ExchangeSettlement.WALLET_CREDIT;
-    }
+if (priceDiff < 0) {
+  const amount = Math.abs(priceDiff);
 
+  if (existing.refundTo === RefundDestination.UPI) {
+    if (!existing.payoutMethodId) return fail("Customer has not provided a payout method");
+    await tx.refund.create({
+      data: {
+        orderId: orderItem.orderId,
+        amount,
+        method: PaymentMethod.UPI,
+        reason: `Exchange price difference (${orderNumber})`,
+        status: RefundStatus.PENDING,
+        processedById: adminId,
+        returnRequestId: id,
+        payoutMethodId: existing.payoutMethodId,
+      },
+    });
+    settlement = ExchangeSettlement.UPI_TRANSFER;
+  } else {
+    await tx.refund.create({
+      data: {
+        orderId: orderItem.orderId,
+        amount,
+        method: PaymentMethod.WALLET,
+        reason: `Exchange price difference credited to wallet (${orderNumber})`,
+        status: RefundStatus.COMPLETED,
+        processedById: adminId,
+        returnRequestId: id,
+      },
+    });
+    await creditWalletTx(tx, {
+      customerId: existing.customerId,
+      amount,
+      reason: `Exchange difference (${orderNumber})`,
+      returnRequestId: id,
+    });
+    settlement = ExchangeSettlement.WALLET_CREDIT;
+  }
+}
     await tx.returnRequest.update({
       where: { id },
       data: {
@@ -338,4 +379,109 @@ export async function processExchange(id: string, adminId: string) {
 
     return exchangeOrder;
   });
+}
+
+export async function listPayouts(filters: { status?: RefundStatus; page?: number; limit?: number }) {
+  const page = filters.page && filters.page > 0 ? filters.page : 1;
+  const limit = filters.limit && filters.limit > 0 ? filters.limit : 20;
+
+  // payoutMethodId sirf is feature ke refunds par hota hai (POS counter refunds bahar)
+  const where: Prisma.RefundWhereInput = {
+    payoutMethodId: { not: null },
+    status: filters.status ?? { in: [RefundStatus.PENDING, RefundStatus.FAILED] },
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.refund.findMany({
+      where,
+      include: {
+        payoutMethod: { select: { upiId: true, label: true } },
+        returnRequest: {
+          select: {
+            id: true,
+            type: true,
+            reason: true,
+            customer: { select: { name: true, phone: true } },
+            orderItem: {
+              select: {
+                product: { select: { name: true } },
+                order: { select: { orderNumber: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" }, // purana pehle
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.refund.count({ where }),
+  ]);
+
+  return {
+    items: rows.map((r) => ({
+      refundId: r.id,
+      returnRequestId: r.returnRequest?.id ?? null,
+      type: r.returnRequest?.type ?? null,
+      status: r.status,
+      amount: Number(r.amount),
+      upiId: r.payoutMethod?.upiId ?? null, // admin ko poori
+      upiLabel: r.payoutMethod?.label ?? null,
+      customerName: r.returnRequest?.customer.name ?? null,
+      customerPhone: r.returnRequest?.customer.phone ?? null,
+      orderNumber: r.returnRequest?.orderItem.order.orderNumber ?? null,
+      productName: r.returnRequest?.orderItem.product.name ?? null,
+      transactionRef: r.transactionRef,
+      failureReason: r.failureReason,
+      paidAt: r.paidAt,
+      createdAt: r.createdAt,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
+}
+
+export async function completePayout(refundId: string, adminId: string, transactionRef: string) {
+  const ref = String(transactionRef ?? "").trim();
+  if (ref.length < 6) return fail("transactionRef (UTR) is required, at least 6 characters");
+
+  return prisma.$transaction(async (tx) => {
+    const marked = await tx.refund.updateMany({
+      where: { id: refundId, status: RefundStatus.PENDING, payoutMethodId: { not: null } },
+      data: {
+        status: RefundStatus.COMPLETED,
+        transactionRef: ref,
+        paidAt: new Date(),
+        processedById: adminId,
+        failureReason: null,
+      },
+    });
+    if (marked.count === 0) return fail("Payout not found or not in PENDING status", 404);
+
+    const refund = await tx.refund.findUnique({
+      where: { id: refundId },
+      include: { returnRequest: { select: { id: true, type: true } } },
+    });
+
+    // RETURN tab REFUNDED hoti hai jab paisa chala jaye (EXCHANGE pehle hi EXCHANGED hai)
+    if (refund?.returnRequest?.type === ReturnType.RETURN) {
+      await tx.returnRequest.update({
+        where: { id: refund.returnRequest.id },
+        data: { status: ReturnStatus.REFUNDED },
+      });
+    }
+    return refund;
+  });
+}
+
+export async function failPayout(refundId: string, adminId: string, reason: string) {
+  const failureReason = String(reason ?? "").trim();
+  if (!failureReason) return fail("reason is required");
+
+  const marked = await prisma.refund.updateMany({
+    where: { id: refundId, status: RefundStatus.PENDING, payoutMethodId: { not: null } },
+    data: { status: RefundStatus.FAILED, failureReason, processedById: adminId },
+  });
+  if (marked.count === 0) return fail("Payout not found or not in PENDING status", 404);
+
+  return prisma.refund.findUnique({ where: { id: refundId } });
 }

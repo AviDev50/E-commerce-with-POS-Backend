@@ -7,27 +7,28 @@ export async function createReturnRequest(req: Request, res: Response) {
   try {
     const customerId = req.customer!.id;
     const {
-      orderItemId,
-      type,
-      reason,
-      reasonNote,
-      quantity,
-      exchangeVariantId,
-    } = req.body;
+  orderItemId, type, reason, reasonNote, quantity,
+  exchangeProductId,  
+  exchangeVariantId,
+  refundTo,            // "WALLET" | "UPI"
+  payoutMethodId,      // refundTo=UPI is necessary
+} = req.body;
 
     const files = req.files as Express.Multer.File[] | undefined;
     const images = files ? files.map((f) => f.filename) : undefined; // ab plain array, JSON.stringify nahi
 
-    const data = await service.createReturnRequest(customerId, {
-      orderItemId,
-      type: type as ReturnType,
-      reason,
-      reasonNote,
-      images,
-      quantity: Number(quantity),
-      exchangeVariantId,
-    });
-
+const data = await service.createReturnRequest(customerId, {
+  orderItemId,
+  type: type as ReturnType,
+  reason,
+  reasonNote,
+  images,
+  quantity: Number(quantity),
+  exchangeProductId,
+  exchangeVariantId,
+  refundTo,
+  payoutMethodId,
+});
     res.status(201).json({ success: true, data });
   } catch (err: any) {
     res
@@ -73,5 +74,18 @@ export async function cancelMyReturn(req: Request, res: Response) {
     res
       .status(err.statusCode || 500)
       .json({ success: false, message: err.message });
+  }
+}
+
+export async function changePayoutMethod(req: Request, res: Response) {
+  try {
+    const data = await service.changePayoutMethodAfterFailure(
+      req.customer!.id,
+      getParam(req.params.id),
+      req.body.payoutMethodId,
+    );
+    res.status(200).json({ success: true, data });
+  } catch (err: any) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 }
