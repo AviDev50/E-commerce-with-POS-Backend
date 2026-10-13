@@ -12,5 +12,6 @@ router.post("/", upload.array("images", 3), controller.createReturnRequest);
 router.get("/", controller.listMyReturns);
 router.get("/:id", controller.getMyReturnById);
 router.patch("/:id/cancel", controller.cancelMyReturn);
+router.patch("/:id/payout-method", controller.changePayoutMethod); // JSON body, after failed upi payout
 
 export default router;
