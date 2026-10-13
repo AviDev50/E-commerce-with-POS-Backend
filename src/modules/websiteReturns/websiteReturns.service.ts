@@ -139,6 +139,14 @@ if (data.refundTo === RefundDestination.UPI) {
     if (!data.exchangeProductId) {
       return fail("exchangeProductId is required for an exchange");
     }
+    if (isExchange) {
+  if (!data.exchangeProductId) {
+    return fail("exchangeProductId is required for an exchange");
+  }
+  // e-commerce mein sirf usi product ka variant (POS mein ye rule nahi hai)
+  if (data.exchangeProductId !== orderItem.productId) {
+    return fail("Exchange is only allowed for a variant of the same product");
+  }
     try {
       const [resolved] = await resolveOrderItems(
         prisma as unknown as Prisma.TransactionClient,
@@ -169,6 +177,7 @@ if (data.refundTo === RefundDestination.UPI) {
       throw e;
     }
   }
+}
 
   const created = await prisma.returnRequest.create({
     data: {
