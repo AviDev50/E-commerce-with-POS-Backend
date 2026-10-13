@@ -7,9 +7,9 @@ const router = Router();
 
 router.use(verifyToken);
 
-router.get("/payouts", checkPermission("refund:payout"), controller.listPayouts);
-router.patch("/payouts/:refundId/complete", checkPermission("refund:payout"), controller.completePayout);
-router.patch("/payouts/:refundId/fail", checkPermission("refund:payout"), controller.failPayout);
+router.get("/payouts", checkPermission("return:manage"), controller.listPayouts);
+router.patch("/payouts/:refundId/complete", checkPermission("return:manage"), controller.completePayout);
+router.patch("/payouts/:refundId/fail", checkPermission("return:manage"), controller.failPayout);
 router.get("/", checkPermission("return:view"), controller.listReturns);
 router.get("/:id", checkPermission("return:view"), controller.getReturnById);
 router.patch("/:id/approve", checkPermission("return:manage"), controller.approveReturn);

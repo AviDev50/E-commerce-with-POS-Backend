@@ -10,7 +10,7 @@ const permissions = [
   { key: "product:update", description: "Edit products" },
   { key: "product:delete", description: "Delete/deactivate products" },
 
-  { key: "attribute:create", description: "Create attributes and values" },
+  { key: "attribute:create", description: "Create attributes and values"},
   { key: "attribute:read", description: "View attributes and values" },
   { key: "attribute:update", description: "Edit attributes and values" },
   { key: "attribute:delete", description: "Delete attributes and values" },
