@@ -19,6 +19,7 @@ export function formatReturnResponse(r: any) {
       variant: r.orderItem.variant ? withFullImageUrls(r.orderItem.variant) : r.orderItem.variant,
     },
     exchangeVariant: r.exchangeVariant ? withFullImageUrls(r.exchangeVariant) : r.exchangeVariant,
+    exchangeProduct: r.exchangeProduct ? withFullImageUrls(r.exchangeProduct) : r.exchangeProduct,
   };
 }
 
