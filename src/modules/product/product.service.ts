@@ -558,13 +558,23 @@ interface PosProductSearchQuery {
   limit?: number;
 }
 
+function safeParseImages(raw: string | null, ctx: string): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    console.error(`[POS] corrupted images -> ${ctx}, len=${raw.length}`);
+    return [];
+  }
+}
+
 export async function getProductsForPosService(query: PosProductSearchQuery) {
   const page = query.page && query.page > 0 ? query.page : 1;
   const limit = query.limit && query.limit > 0 ? query.limit : 20;
 
   const where: Prisma.ProductWhereInput = { isActive: true };
 
-  // name OR sku dono pe search — cashier chahe naam type kare ya SKU
   if (query.search) {
     where.OR = [
       { name: { contains: query.search } },
@@ -572,7 +582,6 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
     ];
   }
 
-  // costPrice explicitly select nahi kiya — safe by construction, filter se nahi, design se
   const products = await prisma.product.findMany({
     where,
     select: {
@@ -584,6 +593,7 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
       images: true,
       _count: { select: { variants: true } },
       variants: {
+        where: { isActive: true }, // inactive variants billing mein na aayein
         select: {
           id: true,
           name: true,
@@ -597,14 +607,13 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
     orderBy: { name: "asc" },
   });
 
-  // in-memory: hasVariants + inStock resolve karo (websiteProduct module jaisa hi pattern)
   const withStockInfo = products.map((p) => {
-    const hasVariants = p._count.variants > 0;
+    const hasVariants = p.variants.length > 0; // _count inactive bhi gin leta hai, isliye variants.length
     const inStock = hasVariants
       ? p.variants.some((v) => v.stock > 0)
       : p.stock > 0;
 
-    const imgs: string[] = p.images ? JSON.parse(p.images) : [];
+    const imgs = safeParseImages(p.images, `product ${p.id}`);
 
     return {
       id: p.id,
@@ -616,7 +625,7 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
       hasVariants,
       inStock,
       variants: p.variants.map((v) => {
-        const vImgs: string[] = v.images ? JSON.parse(v.images) : [];
+        const vImgs = safeParseImages(v.images, `variant ${v.id}`);
         return {
           id: v.id,
           name: v.name,
@@ -630,7 +639,6 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
     };
   });
 
-  // out-of-stock products billing list se hata do — cashier ko select karne ka mauka hi na mile
   const inStockOnly = withStockInfo.filter((p) => p.inStock);
 
   const total = inStockOnly.length;
@@ -642,7 +650,6 @@ export async function getProductsForPosService(query: PosProductSearchQuery) {
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
-
 export async function setProductStatusService(id: string, isActive: boolean) {
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing) throw new Error("Product not found");
