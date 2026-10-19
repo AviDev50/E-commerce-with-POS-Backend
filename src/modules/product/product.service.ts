@@ -183,7 +183,10 @@ export async function getAllProductsService(query: ProductListQuery) {
   };
 }
 
-export async function getProductByIdService(id: string, includeInactive = false) {
+export async function getProductByIdService(
+  id: string,
+  includeInactive = false,
+) {
   const product = await prisma.product.findUnique({
     where: { id },
     include: {
@@ -367,7 +370,10 @@ export async function createVariantService(
   };
 }
 
-export async function getVariantsByProductService(productId: string, includeInactive = false) {
+export async function getVariantsByProductService(
+  productId: string,
+  includeInactive = false,
+) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product || (!product.isActive && !includeInactive)) {
     throw new Error("Product not found");
@@ -649,8 +655,13 @@ export async function setProductStatusService(id: string, isActive: boolean) {
   });
 }
 
-export async function setVariantStatusService(variantId: string, isActive: boolean) {
-  const existing = await prisma.productVariant.findUnique({ where: { id: variantId } });
+export async function setVariantStatusService(
+  variantId: string,
+  isActive: boolean,
+) {
+  const existing = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+  });
   if (!existing) throw new Error("Variant not found");
 
   const variant = await prisma.productVariant.update({
@@ -665,12 +676,12 @@ export async function setVariantStatusService(variantId: string, isActive: boole
       where: { productId: existing.productId, isActive: true },
     });
     if (activeCount === 0) {
-      warning = "This was the last active variant — the product has no purchasable variants now";
+      warning =
+        "This was the last active variant — the product has no purchasable variants now";
     }
   }
 
   return { variant, warning };
 }
-
 
 // getProductByIdService we start from here
