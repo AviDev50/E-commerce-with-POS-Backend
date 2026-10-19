@@ -23,7 +23,7 @@ enum OrderChannel {
 }
 
 enum PayoutType {
-  UPI  
+  UPI
 }
 
 enum OrderStatus {
@@ -40,7 +40,7 @@ enum PaymentMethod {
   UPI
   WALLET
   COD
-  NETBANKING    // ONLINE hata diya — channel field already yeh role nibhata hai
+  NETBANKING // ONLINE hata diya — channel field already yeh role nibhata hai
 }
 
 enum PaymentStatus {
@@ -121,39 +121,39 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders    Order[]  @relation("OrderCreatedBy")
-  refunds   Refund[] @relation("RefundProcessedBy")
+  orders          Order[]         @relation("OrderCreatedBy")
+  refunds         Refund[]        @relation("RefundProcessedBy")
   approvedReturns ReturnRequest[] @relation("ReturnApprovedBy")
-  refreshTokens RefreshToken[]
-  shifts    Shift[]  @relation("CashierShifts") 
-  heldOrders HeldOrder[]
+  refreshTokens   RefreshToken[]
+  shifts          Shift[]         @relation("CashierShifts")
+  heldOrders      HeldOrder[]
 
   @@map("users")
 }
 
 model Customer {
-  id            String         @id @default(uuid())
-  name          String
-  phone         String         @unique
-  email         String? 
-  cart          Cart?          
-  password      String?
-  dob           DateTime?       @db.Date
-  gender        Gender?
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id        String    @id @default(uuid())
+  name      String
+  phone     String    @unique
+  email     String?
+  cart      Cart?
+  password  String?
+  dob       DateTime? @db.Date
+  gender    Gender?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  orders        Order[]
-  addresses     Address[]
-  reviews       Review[]
-  refreshTokens RefreshToken[]
-  wishlistItems WishlistItem[]
+  orders         Order[]
+  addresses      Address[]
+  reviews        Review[]
+  refreshTokens  RefreshToken[]
+  wishlistItems  WishlistItem[]
   returnRequests ReturnRequest[]
   supportTickets SupportTicket[]
-  payoutMethods PayoutMethod[]
-  heldOrders HeldOrder[]
-  wallet Wallet?
+  payoutMethods  PayoutMethod[]
+  heldOrders     HeldOrder[]
+  wallet         Wallet?
 
   @@map("customers")
 }
@@ -172,23 +172,23 @@ model Address {
   isDefault  Boolean     @default(false)
   createdAt  DateTime    @default(now())
 
-  orders     Order[]
+  orders Order[]
 
   @@map("addresses")
 }
 
 model Category {
-  id       String     @id @default(uuid())
-  name     String
-  slug     String     @unique
-  image    String?
-  parentId String?
-  parent   Category?  @relation("CategoryToSubcategory", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryToSubcategory")
-   taxClassId String?
-    taxClass   TaxClass? @relation(fields: [taxClassId], references: [id])
+  id         String     @id @default(uuid())
+  name       String
+  slug       String     @unique
+  image      String?
+  parentId   String?
+  parent     Category?  @relation("CategoryToSubcategory", fields: [parentId], references: [id])
+  children   Category[] @relation("CategoryToSubcategory")
+  taxClassId String?
+  taxClass   TaxClass?  @relation(fields: [taxClassId], references: [id])
 
-  isReturnable Boolean @default(true)
+  isReturnable     Boolean @default(true)
   returnPolicyText String? @db.Text
 
   products Product[]
@@ -200,17 +200,17 @@ model Product {
   id                String    @id @default(uuid())
   name              String
   slug              String    @unique
-  description       String?
+  description       String?   @db.Text
   sku               String    @unique
   price             Decimal   @db.Decimal(10, 2)
   mrp               Decimal?  @db.Decimal(10, 2)
   costPrice         Decimal?  @db.Decimal(10, 2)
   taxClassId        String?
   taxClass          TaxClass? @relation(fields: [taxClassId], references: [id])
-  images            String?
+  images            String?   @db.Text
   isActive          Boolean   @default(true)
   isReturnable      Boolean?
-    returnPolicyText String?  @db.Text
+  returnPolicyText  String?   @db.Text
   stock             Int       @default(0)
   lowStockThreshold Int       @default(5)
   categoryId        String?
@@ -218,35 +218,35 @@ model Product {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  variants          ProductVariant[]
-  orderItems        OrderItem[]
-  reviews           Review[]
-  cartItems         CartItem[]
-  wishlistItems WishlistItem[]
-  exchangeRequests ReturnRequest[] @relation("ExchangeProduct")
+  variants         ProductVariant[]
+  orderItems       OrderItem[]
+  reviews          Review[]
+  cartItems        CartItem[]
+  wishlistItems    WishlistItem[]
+  exchangeRequests ReturnRequest[]  @relation("ExchangeProduct")
 
   @@map("products")
 }
 
 model ProductVariant {
-  id         String   @id @default(uuid())
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  name       String
-  sku        String   @unique
-  price      Decimal  @db.Decimal(10, 2)
-  mrp        Decimal? @db.Decimal(10, 2)
-  stock      Int      @default(0)
-  images     String   @default("[]")
-  isActive   Boolean  @default(true)   
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  name      String
+  sku       String   @unique
+  price     Decimal  @db.Decimal(10, 2)
+  mrp       Decimal? @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  images    String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orderItems      OrderItem[]
   attributeValues VariantAttributeValue[]
-  cartItems  CartItem[]
-  wishlistItems WishlistItem[]
-  exchangeReturns ReturnRequest[] @relation("ExchangeVariant")
+  cartItems       CartItem[]
+  wishlistItems   WishlistItem[]
+  exchangeReturns ReturnRequest[]         @relation("ExchangeVariant")
 
   @@map("product_variants")
 }
@@ -278,7 +278,7 @@ model Coupon {
   expiresAt     DateTime?
   createdAt     DateTime     @default(now())
 
-  orders        Order[]
+  orders Order[]
 
   @@map("coupons")
 }
@@ -290,58 +290,59 @@ model Order {
   status      OrderStatus  @default(PENDING)
 
   customerId  String?
-  customer    Customer?    @relation(fields: [customerId], references: [id])
+  customer    Customer? @relation(fields: [customerId], references: [id])
   createdById String?
-  createdBy   User?        @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdBy   User?     @relation("OrderCreatedBy", fields: [createdById], references: [id])
   addressId   String?
-  address     Address?     @relation(fields: [addressId], references: [id])
+  address     Address?  @relation(fields: [addressId], references: [id])
   couponId    String?
-  coupon      Coupon?      @relation(fields: [couponId], references: [id])
+  coupon      Coupon?   @relation(fields: [couponId], references: [id])
 
-  subtotal    Decimal      @db.Decimal(10, 2)
-  tax         Decimal      @default(0) @db.Decimal(10, 2)
-  discount    Decimal      @default(0) @db.Decimal(10, 2)
-  total       Decimal      @db.Decimal(10, 2)
-  shiftId       String?
+  subtotal Decimal @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+  shiftId  String?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deliveredAt DateTime?
 
-  orderItems  OrderItem[]
-  payments    Payment[]
-  refunds     Refund[]
-  walletTransactions WalletTransaction[]
-  exchangeReturnRequests ReturnRequest[] @relation("ExchangeOrder")
-  shift       Shift?   @relation(fields: [shiftId], references: [id])
-  gatewayOrderId String? @unique   // Razorpay ka razorpay_order_id — idempotency ke liye
-  isExchange Boolean @default(false)
+  orderItems             OrderItem[]
+  payments               Payment[]
+  refunds                Refund[]
+  walletTransactions     WalletTransaction[]
+  exchangeReturnRequests ReturnRequest[]     @relation("ExchangeOrder")
+  shift                  Shift?              @relation(fields: [shiftId], references: [id])
+  gatewayOrderId         String?             @unique // Razorpay ka razorpay_order_id — idempotency ke liye
+  isExchange             Boolean             @default(false)
 
   @@map("orders")
 }
 
 model OrderItem {
-  id          String          @id @default(uuid())
-  orderId     String
-  order       Order           @relation(fields: [orderId], references: [id])
-  productId   String
-  product     Product         @relation(fields: [productId], references: [id])
-  variantId   String?
-  variant     ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity    Int
-  price       Decimal         @db.Decimal(10, 2)
-  taxAmount   Decimal         @default(0) @db.Decimal(10, 2)
+  id           String          @id @default(uuid())
+  orderId      String
+  order        Order           @relation(fields: [orderId], references: [id])
+  productId    String
+  product      Product         @relation(fields: [productId], references: [id])
+  variantId    String?
+  variant      ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity     Int
+  price        Decimal         @db.Decimal(10, 2)
+  taxAmount    Decimal         @default(0) @db.Decimal(10, 2)
   taxBreakdown Json?
-  subtotal    Decimal         @db.Decimal(10, 2)
-  returnedQty Int @default(0)
+  subtotal     Decimal         @db.Decimal(10, 2)
+  returnedQty  Int             @default(0)
 
   returnRequests ReturnRequest[]
+
   @@map("order_items")
 }
 
 model Payment {
   id             String        @id @default(uuid())
-  orderId        String        
+  orderId        String
   order          Order         @relation(fields: [orderId], references: [id])
   method         PaymentMethod
   status         PaymentStatus @default(PENDING)
@@ -353,26 +354,26 @@ model Payment {
 }
 
 model Refund {
-  id            String       @id @default(uuid())
-  orderId       String
-  order         Order        @relation(fields: [orderId], references: [id])
-  amount        Decimal      @db.Decimal(10, 2)
-  method        PaymentMethod?   // from which method new refund is given(drawer-cash vs gateway)
-  reason        String
-  status        RefundStatus @default(PENDING)
-  processedById String?
-  processedBy   User?        @relation("RefundProcessedBy", fields: [processedById], references: [id])
+  id              String         @id @default(uuid())
+  orderId         String
+  order           Order          @relation(fields: [orderId], references: [id])
+  amount          Decimal        @db.Decimal(10, 2)
+  method          PaymentMethod? // from which method new refund is given(drawer-cash vs gateway)
+  reason          String
+  status          RefundStatus   @default(PENDING)
+  processedById   String?
+  processedBy     User?          @relation("RefundProcessedBy", fields: [processedById], references: [id])
   returnRequestId String?        @unique
   returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  shiftId String?
-  shift   Shift?  @relation(fields: [shiftId], references: [id])
-  payoutMethodId String?
-payoutMethod   PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
-transactionRef String?   // UTR
-failureReason  String?
-paidAt         DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  shiftId         String?
+  shift           Shift?         @relation(fields: [shiftId], references: [id])
+  payoutMethodId  String?
+  payoutMethod    PayoutMethod?  @relation(fields: [payoutMethodId], references: [id])
+  transactionRef  String? // UTR
+  failureReason   String?
+  paidAt          DateTime?
 
   @@map("refunds")
 }
@@ -396,17 +397,17 @@ model PayoutMethod {
 }
 
 model StoreSettings {
-  id           String   @id @default(uuid())
-  businessName String   
-  logoUrl      String?
-  email        String?
-  phone        String?
-  address      String?
-  state        String?
-  country      String?
-  currency     String   @default("INR")
-  updatedAt    DateTime @updatedAt
-  returnWindowDays Int @default(7)
+  id               String   @id @default(uuid())
+  businessName     String
+  logoUrl          String?
+  email            String?
+  phone            String?
+  address          String?
+  state            String?
+  country          String?
+  currency         String   @default("INR")
+  updatedAt        DateTime @updatedAt
+  returnWindowDays Int      @default(7)
 
   @@map("store_settings")
 }
@@ -434,10 +435,10 @@ model RolePermission {
 
 model Attribute {
   id        String   @id @default(uuid())
-  name      String   @unique   // e.g. "Color", "Size"
+  name      String   @unique // e.g. "Color", "Size"
   createdAt DateTime @default(now())
 
-  values    AttributeValue[]
+  values AttributeValue[]
 
   @@map("attributes")
 }
@@ -446,7 +447,7 @@ model AttributeValue {
   id          String    @id @default(uuid())
   attributeId String
   attribute   Attribute @relation(fields: [attributeId], references: [id])
-  value       String    // e.g. "Red", "M"
+  value       String // e.g. "Red", "M"
 
   variantLinks VariantAttributeValue[]
 
@@ -480,42 +481,42 @@ model RefreshToken {
 }
 
 model Cart {
-  id         String     @id @default(uuid())
-  customerId String     @unique
-  customer   Customer   @relation(fields: [customerId], references: [id])
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  items      CartItem[]
+  items CartItem[]
 
   @@map("carts")
 }
 
 model CartItem {
-  id         String          @id @default(uuid())
-  cartId     String
-  cart       Cart            @relation(fields: [cartId], references: [id])
-  productId  String
-  product    Product         @relation(fields: [productId], references: [id])
-  variantId  String?
-  variant    ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity   Int             @default(1)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id        String          @id @default(uuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id])
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int             @default(1)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   @@unique([cartId, productId, variantId])
   @@map("cart_items")
 }
 
 model Banner {
-  id         String   @id @default(uuid())
-  title      String?
-  imageUrl   String
-  linkUrl    String?
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  title     String?
+  imageUrl  String
+  linkUrl   String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("banners")
 }
@@ -535,12 +536,12 @@ model WishlistItem {
 }
 
 model TaxClass {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  createdAt DateTime   @default(now())
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
 
-  rates     TaxRate[]
-  products  Product[]
+  rates      TaxRate[]
+  products   Product[]
   categories Category[]
 
   @@map("tax_classes")
@@ -563,44 +564,44 @@ model TaxRate {
 }
 
 model ReturnRequest {
-  id          String       @id @default(uuid())
+  id String @id @default(uuid())
 
   orderItemId String
-  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id])
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
 
-  customerId  String
-  customer    Customer     @relation(fields: [customerId], references: [id])
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
 
-  type        ReturnType   @default(RETURN)
-  reason      String
-  reasonNote  String?
-  images      String?
-  quantity    Int
-  status      ReturnStatus @default(REQUESTED)
+  type       ReturnType   @default(RETURN)
+  reason     String
+  reasonNote String?
+  images     String?
+  quantity   Int
+  status     ReturnStatus @default(REQUESTED)
 
   // Exchange ke case mein hi ye do fields use honge
   exchangeVariantId String?
-  exchangeVariant    ProductVariant? @relation("ExchangeVariant", fields: [exchangeVariantId], references: [id])
-  exchangeOrderId    String?
-  exchangeOrder      Order?          @relation("ExchangeOrder", fields: [exchangeOrderId], references: [id])
+  exchangeVariant   ProductVariant? @relation("ExchangeVariant", fields: [exchangeVariantId], references: [id])
+  exchangeOrderId   String?
+  exchangeOrder     Order?          @relation("ExchangeOrder", fields: [exchangeOrderId], references: [id])
 
-  refund      Refund?
+  refund Refund?
 
   approvedById String?
   approvedBy   User?   @relation("ReturnApprovedBy", fields: [approvedById], references: [id])
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   exchangeProductId String?
-exchangeProduct   Product? @relation("ExchangeProduct", fields: [exchangeProductId], references: [id])
-originalValue     Decimal? @db.Decimal(10, 2)
-newValue          Decimal? @db.Decimal(10, 2)
-priceDiff         Decimal? @db.Decimal(10, 2)
-settlement        ExchangeSettlement?
-walletTransaction WalletTransaction?
-refundTo       RefundDestination?
-payoutMethodId String?
-payoutMethod   PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
+  exchangeProduct   Product?            @relation("ExchangeProduct", fields: [exchangeProductId], references: [id])
+  originalValue     Decimal?            @db.Decimal(10, 2)
+  newValue          Decimal?            @db.Decimal(10, 2)
+  priceDiff         Decimal?            @db.Decimal(10, 2)
+  settlement        ExchangeSettlement?
+  walletTransaction WalletTransaction?
+  refundTo          RefundDestination?
+  payoutMethodId    String?
+  payoutMethod      PayoutMethod?       @relation(fields: [payoutMethodId], references: [id])
 
   @@map("return_requests")
 }
@@ -648,22 +649,21 @@ enum ShiftStatus {
 }
 
 model Shift {
-  id              String      @id @default(uuid())
-  cashierId       String
-  cashier         User        @relation("CashierShifts", fields: [cashierId], references: [id])
-  status          ShiftStatus @default(OPEN)
+  id        String      @id @default(uuid())
+  cashierId String
+  cashier   User        @relation("CashierShifts", fields: [cashierId], references: [id])
+  status    ShiftStatus @default(OPEN)
 
-  openingCash     Decimal     @db.Decimal(10, 2)
-  openedAt        DateTime    @default(now())
+  openingCash Decimal  @db.Decimal(10, 2)
+  openedAt    DateTime @default(now())
 
-  closingCash     Decimal?    @db.Decimal(10, 2)  // cashier ne physically count karke jo enter kiya
-  expectedCash    Decimal?    @db.Decimal(10, 2)  // system-calculated
-  discrepancy     Decimal?    @db.Decimal(10, 2)  // closingCash - expectedCash
-  closedAt        DateTime?
+  closingCash  Decimal?  @db.Decimal(10, 2) // cashier ne physically count karke jo enter kiya
+  expectedCash Decimal?  @db.Decimal(10, 2) // system-calculated
+  discrepancy  Decimal?  @db.Decimal(10, 2) // closingCash - expectedCash
+  closedAt     DateTime?
 
-  orders          Order[]
+  orders  Order[]
   refunds Refund[]
-  
 
   @@map("shifts")
 }
@@ -680,8 +680,8 @@ model HeldOrder {
   cashier    User            @relation(fields: [cashierId], references: [id])
   customerId String?
   customer   Customer?       @relation(fields: [customerId], references: [id])
-  items      Json            // [{ productId, variantId?, quantity }]
-  note       String?         // "window customer", "table 3" jaisa cashier ka apna label
+  items      Json // [{ productId, variantId?, quantity }]
+  note       String? // "window customer", "table 3" jaisa cashier ka apna label
   status     HeldOrderStatus @default(HELD)
   createdAt  DateTime        @default(now())
   resumedAt  DateTime?
@@ -711,8 +711,8 @@ model WalletTransaction {
   returnRequestId String?        @unique // ek request se sirf ek credit, double credit nahi
   returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
   createdAt       DateTime       @default(now())
-  orderId String?
-  order   Order?  @relation(fields: [orderId], references: [id])
+  orderId         String?
+  order           Order?         @relation(fields: [orderId], references: [id])
 
   @@map("wallet_transactions")
 }
