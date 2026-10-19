@@ -209,7 +209,7 @@ model Product {
   taxClass          TaxClass? @relation(fields: [taxClassId], references: [id])
   images            String?
   isActive          Boolean   @default(true)
-    isReturnable      Boolean?
+  isReturnable      Boolean?
     returnPolicyText String?  @db.Text
   stock             Int       @default(0)
   lowStockThreshold Int       @default(5)

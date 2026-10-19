@@ -4,10 +4,14 @@ import * as bannerService from "./banner.service.js";
 export async function createBanner(req: Request, res: Response) {
   try {
     const { title, linkUrl, sortOrder } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    const imageUrl = req.file
+      ? `/uploads/${req.file.filename}`
+      : req.body.imageUrl;
 
     if (!imageUrl) {
-      return res.status(400).json({ message: "imageUrl (or uploaded image) is required" });
+      return res
+        .status(400)
+        .json({ message: "imageUrl (or uploaded image) is required" });
     }
 
     const banner = await bannerService.createBannerService({
@@ -46,14 +50,19 @@ export async function updateBanner(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const { title, linkUrl, sortOrder, isActive } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.imageUrl;
+    const imageUrl = req.file
+      ? `/uploads/${req.file.filename}`
+      : req.body.imageUrl;
 
     const banner = await bannerService.updateBannerService(id, {
       title,
       imageUrl,
       linkUrl,
       sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
-      isActive: isActive !== undefined ? isActive === "true" || isActive === true : undefined,
+      isActive:
+        isActive !== undefined
+          ? isActive === "true" || isActive === true
+          : undefined,
     });
 
     return res.status(200).json({ message: "Banner updated", data: banner });

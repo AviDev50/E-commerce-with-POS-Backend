@@ -86,13 +86,15 @@ export async function getAllProducts(req: Request, res: Response) {
 export async function getProductById(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const product = await productService.getProductByIdService(id, canSeeInactive(req));
+    const product = await productService.getProductByIdService(
+      id,
+      canSeeInactive(req),
+    );
     return res.status(200).json({ data: product });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
   }
 }
-
 
 export async function updateProduct(req: Request, res: Response) {
   try {
@@ -193,7 +195,10 @@ export async function createVariant(req: Request, res: Response) {
 export async function getVariantsByProduct(req: Request, res: Response) {
   try {
     const productId = req.params.id as string;
-    const variants = await productService.getVariantsByProductService(productId, canSeeInactive(req));
+    const variants = await productService.getVariantsByProductService(
+      productId,
+      canSeeInactive(req),
+    );
     return res.status(200).json({ data: variants });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
@@ -304,7 +309,9 @@ export async function setProductStatus(req: Request, res: Response) {
     const id = req.params.id as string;
     const isActive = parseBool(req.body.isActive);
     if (isActive === undefined) {
-      return res.status(400).json({ message: "isActive (boolean) is required" });
+      return res
+        .status(400)
+        .json({ message: "isActive (boolean) is required" });
     }
     const product = await productService.setProductStatusService(id, isActive);
     return res.status(200).json({
@@ -321,9 +328,14 @@ export async function setVariantStatus(req: Request, res: Response) {
     const variantId = req.params.variantId as string;
     const isActive = parseBool(req.body.isActive);
     if (isActive === undefined) {
-      return res.status(400).json({ message: "isActive (boolean) is required" });
+      return res
+        .status(400)
+        .json({ message: "isActive (boolean) is required" });
     }
-    const { variant, warning } = await productService.setVariantStatusService(variantId, isActive);
+    const { variant, warning } = await productService.setVariantStatusService(
+      variantId,
+      isActive,
+    );
     return res.status(200).json({
       message: isActive ? "Variant activated" : "Variant deactivated",
       data: variant,

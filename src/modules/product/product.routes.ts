@@ -18,7 +18,11 @@ router.get(
 
 // Public — customer bhi dekh sakta hai
 router.get("/", optionalAuth, productController.getAllProducts);
-router.get("/:id/variants",optionalAuth, productController.getVariantsByProduct);
+router.get(
+  "/:id/variants",
+  optionalAuth,
+  productController.getVariantsByProduct,
+);
 router.get("/:id", productController.getProductById);
 
 // Protected — staff only

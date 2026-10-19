@@ -1,5 +1,5 @@
 import prisma from "../../config/db.js";
-import { formatImageUrl } from "../../utils/formatImageUrl.js"; // ⚠️ apna actual utility path daalo
+import { formatImageUrl } from "../../utils/formatImageUrl.js";
 
 interface CreateBannerInput {
   title?: string;
@@ -51,7 +51,10 @@ export async function getBannerByIdService(id: string) {
   return formatBanner(banner);
 }
 
-export async function updateBannerService(id: string, input: UpdateBannerInput) {
+export async function updateBannerService(
+  id: string,
+  input: UpdateBannerInput,
+) {
   const existing = await prisma.banner.findUnique({ where: { id } });
   if (!existing) {
     throw new Error("Banner not found");
