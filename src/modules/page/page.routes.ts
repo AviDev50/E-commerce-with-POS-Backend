@@ -11,12 +11,14 @@ router.get(
   checkPermission("page:read"),
   pageController.getAllPages,
 );
+
 router.get(
   "/:type",
   verifyToken,
   checkPermission("page:read"),
   pageController.getPageByType,
 );
+
 router.put(
   "/:type",
   verifyToken,
