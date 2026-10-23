@@ -110,7 +110,7 @@ app.use("/api/v1/pos/customers", customerManagementRoutes);
 app.use("/api/v1/pos/reports", reportsRoutes);
 app.use("/api/v1/pos/shifts", shiftRoutes);
 app.use("/api/v1/pos/held-orders", heldOrderRoutes);
-app.use("/api/pos-pages", posPageRoutes);
+app.use("/api/v1/pos-pages", posPageRoutes);
 
 // Start Server
 app.listen(PORT, () => {
