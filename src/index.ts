@@ -40,6 +40,7 @@ import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js";
 import razorpayRoutes from "./modules/razorpay/razorpay.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js"
 import payoutMethodsRoutes from "./modules/payoutMethods/payoutMethods.routes.js"
+import posPageRoutes from "./modules/pos-page/pos-page.routes.js"
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -109,6 +110,7 @@ app.use("/api/v1/pos/customers", customerManagementRoutes);
 app.use("/api/v1/pos/reports", reportsRoutes);
 app.use("/api/v1/pos/shifts", shiftRoutes);
 app.use("/api/v1/pos/held-orders", heldOrderRoutes);
+app.use("/api/pos-pages", posPageRoutes);
 
 // Start Server
 app.listen(PORT, () => {

@@ -626,6 +626,7 @@ model SupportTicket {
   @@map("support_tickets")
 }
 
+//this used for e-commerce
 enum PageType {
   ABOUT_US
   TERMS_AND_CONDITIONS
@@ -633,6 +634,7 @@ enum PageType {
   RETURN_AND_REFUND_POLICY
 }
 
+//this used for e-commerce 
 model StorePage {
   id        String   @id @default(uuid())
   type      PageType @unique
@@ -715,4 +717,22 @@ model WalletTransaction {
   order           Order?         @relation(fields: [orderId], references: [id])
 
   @@map("wallet_transactions")
+}
+
+//this used for pos
+enum PosPageType {
+  PRIVACY_POLICY
+  TERMS_AND_CONDITIONS
+  ABOUT_US
+}
+
+//this used for pos
+model PosPage {
+  id        String      @id @default(uuid())
+  type      PosPageType @unique
+  title     String
+  content   String      @db.Text
+  updatedAt DateTime    @updatedAt
+
+  @@map("pos_pages")
 }
