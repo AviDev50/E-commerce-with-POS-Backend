@@ -4,17 +4,14 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { Request } from "express";
 
-// __dirname ESM mein available nahi hota — manually derive karna padta hai
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure uploads folder exists
 const uploadDir = path.join(__dirname, "../uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Storage config — file kahan aur kis naam se save hoga
 const storage = multer.diskStorage({
   destination: (_req: Request, _file: Express.Multer.File, cb) => {
     cb(null, uploadDir);
@@ -26,8 +23,11 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter — sirf images allow karo
-const fileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
 
   if (allowedTypes.includes(file.mimetype)) {

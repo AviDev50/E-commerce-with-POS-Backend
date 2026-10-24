@@ -28,7 +28,9 @@ export const getAllAttributesService = async () => {
   });
 };
 
-export const addAttributeValueService = async (data: CreateAttributeValueInput) => {
+export const addAttributeValueService = async (
+  data: CreateAttributeValueInput,
+) => {
   const attribute = await prisma.attribute.findUnique({
     where: { id: data.attributeId },
   });
@@ -40,7 +42,7 @@ export const addAttributeValueService = async (data: CreateAttributeValueInput) 
   const existingValue = await prisma.attributeValue.findFirst({
     where: {
       attributeId: data.attributeId,
-     value: { equals: data.value },
+      value: { equals: data.value },
     },
   });
 
@@ -59,12 +61,12 @@ export const addAttributeValueService = async (data: CreateAttributeValueInput) 
 // Reusable helper — "Find or Create" pattern (jaisa humne discuss kiya tha)
 export const findOrCreateAttributeValueService = async (
   attributeId: string,
-  value: string
+  value: string,
 ) => {
   const existingValue = await prisma.attributeValue.findFirst({
     where: {
       attributeId,
-      value: { equals: value},
+      value: { equals: value },
     },
   });
 

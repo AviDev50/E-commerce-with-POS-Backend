@@ -11,7 +11,7 @@ import { checkPermission } from "../../middlewares/permission.middleware.js";
 
 const router = Router();
 
-router.use(verifyToken); // saare routes ke liye login zaroori
+router.use(verifyToken); // login required for all routes
 
 router.get("/", checkPermission("attribute:read"), getAllAttributes);
 router.post("/", checkPermission("attribute:create"), createAttribute);

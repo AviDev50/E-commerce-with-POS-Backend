@@ -5,7 +5,6 @@ import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = Router();
 
-// Public: React website ke liye (login nahi chahiye)
 router.get("/public/:type", controller.getPublicPosPage);
 
 // Authenticated: admin / POS panel

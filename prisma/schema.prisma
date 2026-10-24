@@ -730,7 +730,7 @@ enum PosPageType {
 model PosPage {
   id        String      @id @default(uuid())
   type      PosPageType @unique
-  title     String
+  title     String      
   content   String      @db.Text
   updatedAt DateTime    @updatedAt
 

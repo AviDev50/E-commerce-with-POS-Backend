@@ -26,7 +26,9 @@ export async function getPosPageByType(req: Request, res: Response) {
     }
     const page = await service.getPosPageByTypeService(type);
     if (!page) {
-      return res.status(404).json({ message: "Content not set yet for this page type" });
+      return res
+        .status(404)
+        .json({ message: "Content not set yet for this page type" });
     }
     return res.status(200).json({ data: page });
   } catch (error: any) {

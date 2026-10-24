@@ -7,8 +7,6 @@ import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 
-// Static route ko "/:id" se PEHLE rakhna hai, warna Express "/pos/search" ko
-// "/:id/variants" pattern se match karne ki koshish kar sakta hai (safe practice)
 router.get(
   "/pos/search",
   verifyToken,
@@ -16,7 +14,7 @@ router.get(
   productController.getProductsForPos,
 );
 
-// Public — customer bhi dekh sakta hai
+// Public — customer also see
 router.get("/", optionalAuth, productController.getAllProducts);
 router.get(
   "/:id/variants",
