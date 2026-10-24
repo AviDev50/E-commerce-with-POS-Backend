@@ -6,7 +6,7 @@ import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 
-// Admin only — sab protected, staff permission required
+// Admin only — all protected, staff permission required
 router.get(
   "/",
   verifyToken,

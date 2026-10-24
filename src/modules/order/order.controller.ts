@@ -39,7 +39,8 @@ export async function createPosOrder(req: Request, res: Response) {
     for (const p of payments) {
       if (!p.method || typeof p.amount !== "number" || p.amount <= 0) {
         return res.status(400).json({
-          message: "each payment must have a valid method and a positive amount",
+          message:
+            "each payment must have a valid method and a positive amount",
         });
       }
     }
@@ -61,15 +62,26 @@ export async function createPosOrder(req: Request, res: Response) {
 
 export async function createOnlineOrder(req: Request, res: Response) {
   try {
-    const { items, addressId, couponCode, cartItemIds, paymentMethod } = req.body;
+    const { items, addressId, couponCode, cartItemIds, paymentMethod } =
+      req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0 || !addressId || !paymentMethod) {
-      return res.status(400).json({ message: "items, addressId, and paymentMethod are required" });
+    if (
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !addressId ||
+      !paymentMethod
+    ) {
+      return res
+        .status(400)
+        .json({ message: "items, addressId, and paymentMethod are required" });
     }
 
     if (!["COD", "WALLET"].includes(paymentMethod)) {
-  return res.status(400).json({ message: "paymentMethod must be COD or WALLET" });
-}
+      return res
+        .status(400)
+        .json({ message: "paymentMethod must be COD or WALLET" });
+    }
 
     const order = await orderService.createOnlineOrderService({
       items,
@@ -171,7 +183,9 @@ export async function previewOnlineOrder(req: Request, res: Response) {
     const { items, addressId, couponCode } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0 || !addressId) {
-      return res.status(400).json({ message: "items and addressId are required" });
+      return res
+        .status(400)
+        .json({ message: "items and addressId are required" });
     }
 
     const preview = await orderService.previewOnlineOrderService({
@@ -196,7 +210,11 @@ export async function cancelOrder(req: Request, res: Response) {
       return res.status(400).json({ message: "reason is required" });
     }
 
-    const result = await orderService.cancelOrderService(id, req.customer!.id, reason);
+    const result = await orderService.cancelOrderService(
+      id,
+      req.customer!.id,
+      reason,
+    );
     return res.status(200).json({ message: "Order cancelled", data: result });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
@@ -207,7 +225,10 @@ export async function getOrderReceipt(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const requestingCustomerId = req.customer ? req.customer.id : undefined;
-    const receipt = await orderService.getOrderReceiptService(id, requestingCustomerId);
+    const receipt = await orderService.getOrderReceiptService(
+      id,
+      requestingCustomerId,
+    );
     return res.status(200).json({ data: receipt });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
@@ -228,7 +249,9 @@ export async function getPosOrderHistory(req: Request, res: Response) {
       limit: limit ? Number(limit) : undefined,
     });
 
-    return res.status(200).json({ data: result.orders, pagination: result.pagination });
+    return res
+      .status(200)
+      .json({ data: result.orders, pagination: result.pagination });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }
@@ -236,28 +259,56 @@ export async function getPosOrderHistory(req: Request, res: Response) {
 
 export async function instantPosExchange(req: Request, res: Response) {
   try {
-    const { orderItemId, newProductId, newVariantId, payments, refundMethod, reason } = req.body;
+    const {
+      orderItemId,
+      newProductId,
+      newVariantId,
+      payments,
+      refundMethod,
+      reason,
+    } = req.body;
     const quantity = Number(req.body.quantity);
 
-    if (!orderItemId || !Number.isInteger(quantity) || quantity <= 0 || !newProductId) {
+    if (
+      !orderItemId ||
+      !Number.isInteger(quantity) ||
+      quantity <= 0 ||
+      !newProductId
+    ) {
       return res.status(400).json({
-        message: "orderItemId, a positive integer quantity, and newProductId are required",
+        message:
+          "orderItemId, a positive integer quantity, and newProductId are required",
       });
     }
     if (
       payments !== undefined &&
       (!Array.isArray(payments) ||
-        payments.some((p: any) => !p.method || typeof p.amount !== "number" || p.amount <= 0))
+        payments.some(
+          (p: any) =>
+            !p.method || typeof p.amount !== "number" || p.amount <= 0,
+        ))
     ) {
-      return res.status(400).json({ message: "each payment must have a valid method and a positive amount" });
+      return res
+        .status(400)
+        .json({
+          message:
+            "each payment must have a valid method and a positive amount",
+        });
     }
 
     const result = await orderService.instantPosExchangeService({
-      orderItemId, quantity, newProductId, newVariantId,
-      payments, refundMethod, reason,
+      orderItemId,
+      quantity,
+      newProductId,
+      newVariantId,
+      payments,
+      refundMethod,
+      reason,
       createdById: req.user!.id,
     });
-    return res.status(201).json({ message: "Exchange completed", data: result });
+    return res
+      .status(201)
+      .json({ message: "Exchange completed", data: result });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }
@@ -267,13 +318,22 @@ export async function previewPosExchange(req: Request, res: Response) {
   try {
     const { orderItemId, newProductId, newVariantId } = req.body;
     const quantity = Number(req.body.quantity);
-    if (!orderItemId || !Number.isInteger(quantity) || quantity <= 0 || !newProductId) {
+    if (
+      !orderItemId ||
+      !Number.isInteger(quantity) ||
+      quantity <= 0 ||
+      !newProductId
+    ) {
       return res.status(400).json({
-        message: "orderItemId, a positive integer quantity, and newProductId are required",
+        message:
+          "orderItemId, a positive integer quantity, and newProductId are required",
       });
     }
     const data = await orderService.previewPosExchangeService({
-      orderItemId, quantity, newProductId, newVariantId,
+      orderItemId,
+      quantity,
+      newProductId,
+      newVariantId,
     });
     return res.status(200).json({ data });
   } catch (error: any) {

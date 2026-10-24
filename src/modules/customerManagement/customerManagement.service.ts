@@ -60,9 +60,7 @@ export async function getAllCustomersService(filters: GetAllCustomersFilters) {
   return prisma.customer.findMany({
     where: filters.search
       ? {
-          OR: [
-                 { phone: { contains: filters.search } },
-          ],
+          OR: [{ phone: { contains: filters.search } }],
         }
       : {},
     select: {

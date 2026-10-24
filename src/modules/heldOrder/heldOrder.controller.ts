@@ -58,7 +58,9 @@ export async function cancelHeldOrder(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const held = await heldOrderService.cancelHeldOrderService(id);
-    return res.status(200).json({ message: "Held order cancelled", data: held });
+    return res
+      .status(200)
+      .json({ message: "Held order cancelled", data: held });
   } catch (error: any) {
     return res.status(error.statusCode || 400).json({ message: error.message });
   }

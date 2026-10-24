@@ -34,7 +34,11 @@ export async function updateCartItem(req: Request, res: Response) {
     const itemId = req.params.id as string;
     const { quantity } = req.body;
 
-    const cart = await cartService.updateCartItemService(customerId, itemId, Number(quantity));
+    const cart = await cartService.updateCartItemService(
+      customerId,
+      itemId,
+      Number(quantity),
+    );
     return res.status(200).json({ message: "Cart item updated", data: cart });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
@@ -47,7 +51,9 @@ export async function removeCartItem(req: Request, res: Response) {
     const itemId = req.params.id as string;
 
     const cart = await cartService.removeCartItemService(customerId, itemId);
-    return res.status(200).json({ message: "Item removed from cart", data: cart });
+    return res
+      .status(200)
+      .json({ message: "Item removed from cart", data: cart });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }

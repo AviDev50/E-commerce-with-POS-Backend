@@ -7,7 +7,7 @@ interface CreateCategoryInput {
   parentId?: string;
   taxClassId?: string;
   image?: string;
-  isReturnable?: boolean; // omit kiya to schema ka @default(true) apply hoga
+  isReturnable?: boolean; // if we omit then schema's @default(true) apply work
   returnPolicyText?: string;
 }
 
@@ -54,7 +54,7 @@ export async function createCategoryService(data: CreateCategoryInput) {
       taxClassId: data.taxClassId,
       image: data.image,
       isReturnable: data.isReturnable, // undefined pass hoga to Prisma khud @default(true) le lega
-        returnPolicyText: data.returnPolicyText,
+      returnPolicyText: data.returnPolicyText,
     },
   });
 

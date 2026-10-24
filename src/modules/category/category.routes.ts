@@ -6,7 +6,6 @@ import { upload } from "../../middlewares/upload.middleware.js";
 
 const router = Router();
 
-// Public — customer bhi category browse kar sake
 router.get("/", categoryController.getAllCategories);
 router.get("/:id", categoryController.getCategoryById);
 

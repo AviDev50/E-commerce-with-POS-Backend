@@ -3,7 +3,8 @@ import * as categoryService from "./category.service.js";
 
 export async function createCategory(req: Request, res: Response) {
   try {
-    const { name, slug, parentId, taxClassId, isReturnable, returnPolicyText } = req.body;
+    const { name, slug, parentId, taxClassId, isReturnable, returnPolicyText } =
+      req.body;
 
     if (!name) {
       return res.status(400).json({ message: "name is required" });
@@ -18,11 +19,14 @@ export async function createCategory(req: Request, res: Response) {
       parentId,
       taxClassId,
       image,
-      isReturnable: isReturnable !== undefined ? isReturnable === "true" : undefined,
+      isReturnable:
+        isReturnable !== undefined ? isReturnable === "true" : undefined,
       returnPolicyText, // plain string hai, form-data se already string aata hai — koi coercion nahi chahiye
     });
 
-    return res.status(201).json({ message: "Category created", data: category });
+    return res
+      .status(201)
+      .json({ message: "Category created", data: category });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }
@@ -52,7 +56,8 @@ export async function getCategoryById(req: Request, res: Response) {
 export async function updateCategory(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
-    const { name, slug, parentId, taxClassId, isReturnable, returnPolicyText } = req.body;
+    const { name, slug, parentId, taxClassId, isReturnable, returnPolicyText } =
+      req.body;
 
     const file = req.file as Express.Multer.File | undefined;
     const image = file ? `/uploads/${file.filename}` : undefined;
@@ -63,11 +68,14 @@ export async function updateCategory(req: Request, res: Response) {
       parentId,
       taxClassId,
       image,
-      isReturnable: isReturnable !== undefined ? isReturnable === "true" : undefined,
+      isReturnable:
+        isReturnable !== undefined ? isReturnable === "true" : undefined,
       returnPolicyText,
     });
 
-    return res.status(200).json({ message: "Category updated", data: category });
+    return res
+      .status(200)
+      .json({ message: "Category updated", data: category });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }

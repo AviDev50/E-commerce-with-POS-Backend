@@ -8,7 +8,7 @@ const router = Router();
 router.get("/public/:type", controller.getPublicPosPage);
 
 // Authenticated: admin / POS panel
-router.get("/",controller.getAllPosPages);
+router.get("/", controller.getAllPosPages);
 router.get("/:type", controller.getPosPageByType);
 router.put("/:type", verifyToken, controller.upsertPosPage);
 

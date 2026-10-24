@@ -80,7 +80,9 @@ export async function resumeHeldOrderService(id: string) {
   }
 
   if (held.status !== HeldOrderStatus.HELD) {
-    const err: any = new Error(`Cannot resume — this order is already ${held.status}`);
+    const err: any = new Error(
+      `Cannot resume — this order is already ${held.status}`,
+    );
     err.statusCode = 400;
     throw err;
   }
@@ -105,7 +107,9 @@ export async function cancelHeldOrderService(id: string) {
   }
 
   if (held.status !== HeldOrderStatus.HELD) {
-    const err: any = new Error(`Cannot cancel — this order is already ${held.status}`);
+    const err: any = new Error(
+      `Cannot cancel — this order is already ${held.status}`,
+    );
     err.statusCode = 400;
     throw err;
   }
