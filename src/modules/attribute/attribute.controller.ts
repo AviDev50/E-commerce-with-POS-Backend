@@ -16,7 +16,9 @@ export const createAttribute = async (req: Request, res: Response) => {
     }
 
     const attribute = await createAttributeService({ name });
-    return res.status(201).json({ message: "Attribute created", data: attribute });
+    return res
+      .status(201)
+      .json({ message: "Attribute created", data: attribute });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }
@@ -36,11 +38,18 @@ export const addAttributeValue = async (req: Request, res: Response) => {
     const { attributeId, value } = req.body;
 
     if (!attributeId || !value) {
-      return res.status(400).json({ message: "attributeId and value are required" });
+      return res
+        .status(400)
+        .json({ message: "attributeId and value are required" });
     }
 
-    const attributeValue = await addAttributeValueService({ attributeId, value });
-    return res.status(201).json({ message: "Attribute value added", data: attributeValue });
+    const attributeValue = await addAttributeValueService({
+      attributeId,
+      value,
+    });
+    return res
+      .status(201)
+      .json({ message: "Attribute value added", data: attributeValue });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }

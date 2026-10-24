@@ -28,7 +28,7 @@ export function optionalAnyAuth(
         req.user = { id: decoded.id, role: decoded.role };
       }
     } catch {
-      // Invalid token — guest treat karo, error mat do
+      // here we treating as guest not giving error
     }
   }
 

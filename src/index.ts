@@ -38,9 +38,9 @@ import reportsRoutes from "./modules/reports/reports.routes.js";
 import shiftRoutes from "./modules/shift/shift.routes.js";
 import heldOrderRoutes from "./modules/heldOrder/heldOrder.routes.js";
 import razorpayRoutes from "./modules/razorpay/razorpay.routes.js";
-import walletRoutes from "./modules/wallet/wallet.routes.js"
-import payoutMethodsRoutes from "./modules/payoutMethods/payoutMethods.routes.js"
-import posPageRoutes from "./modules/pos-page/pos-page.routes.js"
+import walletRoutes from "./modules/wallet/wallet.routes.js";
+import payoutMethodsRoutes from "./modules/payoutMethods/payoutMethods.routes.js";
+import posPageRoutes from "./modules/pos-page/pos-page.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -103,7 +103,7 @@ app.use("/api/v1/website/pages", websitePageRoutes);
 app.use("/api/v1/website/search", websiteSearchRoutes);
 app.use("/api/v1/website/payments/razorpay", razorpayRoutes);
 app.use("/api/v1/website/wallet", walletRoutes);
-app.use("/api/v1/payout-methods", payoutMethodsRoutes)
+app.use("/api/v1/payout-methods", payoutMethodsRoutes);
 
 //pos panel website routes
 app.use("/api/v1/pos/customers", customerManagementRoutes);
@@ -116,8 +116,3 @@ app.use("/api/v1/pos-pages", posPageRoutes);
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-
-
-
-

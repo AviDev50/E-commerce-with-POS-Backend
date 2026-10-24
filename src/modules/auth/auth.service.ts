@@ -2,7 +2,11 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../../config/db.js";
 import { Role } from "@prisma/client";
-import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken.js";
+import {
+  generateRefreshToken,
+  hashToken,
+  getRefreshTokenExpiry,
+} from "../../utils/refreshToken.js";
 
 interface RegisterInput {
   name: string;
@@ -18,11 +22,10 @@ interface LoginInput {
 }
 
 function generateAccessToken(id: string, role: Role): string {
-  return jwt.sign(
-    { id, role },
-    process.env.JWT_SECRET as string,
-    { expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN || "15m") as jwt.SignOptions["expiresIn"] }
-  );
+  return jwt.sign({ id, role }, process.env.JWT_SECRET as string, {
+    expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN ||
+      "15m") as jwt.SignOptions["expiresIn"],
+  });
 }
 
 export async function registerService(data: RegisterInput) {
@@ -60,7 +63,9 @@ export async function loginService(data: LoginInput) {
   }
 
   if (!user.isActive) {
-    const err: any = new Error("Your account has been deactivated. Please contact your admin.");
+    const err: any = new Error(
+      "Your account has been deactivated. Please contact your admin.",
+    );
     err.statusCode = 403;
     throw err;
   }
@@ -83,7 +88,11 @@ export async function loginService(data: LoginInput) {
   });
 
   const { password, ...userWithoutPassword } = user;
-  return { user: userWithoutPassword, accessToken, refreshToken: rawRefreshToken };
+  return {
+    user: userWithoutPassword,
+    accessToken,
+    refreshToken: rawRefreshToken,
+  };
 }
 
 export async function refreshAccessTokenService(rawRefreshToken: string) {
@@ -94,7 +103,12 @@ export async function refreshAccessTokenService(rawRefreshToken: string) {
     include: { user: true },
   });
 
-  if (!stored || stored.revoked || stored.expiresAt < new Date() || !stored.user) {
+  if (
+    !stored ||
+    stored.revoked ||
+    stored.expiresAt < new Date() ||
+    !stored.user
+  ) {
     throw new Error("Invalid or expired refresh token");
   }
 
@@ -104,7 +118,10 @@ export async function refreshAccessTokenService(rawRefreshToken: string) {
     throw err;
   }
 
-  await prisma.refreshToken.update({ where: { id: stored.id }, data: { revoked: true } });
+  await prisma.refreshToken.update({
+    where: { id: stored.id },
+    data: { revoked: true },
+  });
 
   const newRawRefreshToken = generateRefreshToken();
   await prisma.refreshToken.create({

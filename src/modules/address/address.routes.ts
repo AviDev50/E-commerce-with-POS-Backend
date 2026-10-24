@@ -4,7 +4,7 @@ import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.j
 
 const router = Router();
 
-router.use(verifyCustomerToken); // saare routes customer-only hain
+router.use(verifyCustomerToken); // all routes customer-only
 
 router.post("/", addressController.createAddress);
 router.get("/", addressController.getMyAddresses);

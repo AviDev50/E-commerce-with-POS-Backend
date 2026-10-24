@@ -11,7 +11,13 @@ export async function registerUser(req: Request, res: Response) {
       });
     }
 
-    const user = await authService.registerService({ name, phone, email, password, role });
+    const user = await authService.registerService({
+      name,
+      phone,
+      email,
+      password,
+      role,
+    });
 
     return res.status(201).json({
       message: "User registered successfully",

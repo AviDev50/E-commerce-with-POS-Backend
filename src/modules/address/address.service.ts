@@ -64,7 +64,11 @@ export async function getAddressByIdService(id: string, customerId: string) {
   return address;
 }
 
-export async function updateAddressService(id: string, customerId: string, data: UpdateAddressInput) {
+export async function updateAddressService(
+  id: string,
+  customerId: string,
+  data: UpdateAddressInput,
+) {
   const existing = await prisma.address.findUnique({ where: { id } });
 
   if (!existing || existing.customerId !== customerId) {
