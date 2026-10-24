@@ -1,11 +1,22 @@
 import prisma from "../../config/db.js";
-import { Prisma, PaymentMethod, PaymentStatus, OrderStatus, OrderItem, Order, ExchangeSettlement } from "@prisma/client";
+import {
+  Prisma,
+  PaymentMethod,
+  PaymentStatus,
+  OrderStatus,
+  OrderItem,
+  Order,
+  ExchangeSettlement,
+} from "@prisma/client";
 import { fail } from "../../utils/fail.js";
 import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { computeCouponDiscount } from "../../utils/couponValidator.js";
 import { formatImageUrl } from "../../utils/formatImageUrl.js";
-import { DEFAULT_RETURN_WINDOW_DAYS, PENDING_RETURN_STATUSES } from "../../utils/returnPolicy.js";
+import {
+  DEFAULT_RETURN_WINDOW_DAYS,
+  PENDING_RETURN_STATUSES,
+} from "../../utils/returnPolicy.js";
 import { creditWalletTx, debitWalletTx } from "../wallet/wallet.service.js";
 
 interface OrderItemInput {
@@ -114,12 +125,12 @@ export async function resolveOrderItems(
       include: { category: true },
     });
 
-  if (!product) {
-  throw new Error("Product not found");
-}
-if (!product.isActive) {
-  throw new Error(`"${product.name}" is currently unavailable`);
-}
+    if (!product) {
+      throw new Error("Product not found");
+    }
+    if (!product.isActive) {
+      throw new Error(`"${product.name}" is currently unavailable`);
+    }
 
     let price: number;
 
@@ -127,12 +138,14 @@ if (!product.isActive) {
       const variant = await tx.productVariant.findUnique({
         where: { id: item.variantId },
       });
-     if (!variant || variant.productId !== item.productId) {
-  throw new Error(`Variant not found for product: ${product.name}`);
-}
-if (!variant.isActive) {
-  throw new Error(`"${product.name} - ${variant.name}" is currently unavailable`);
-}
+      if (!variant || variant.productId !== item.productId) {
+        throw new Error(`Variant not found for product: ${product.name}`);
+      }
+      if (!variant.isActive) {
+        throw new Error(
+          `"${product.name} - ${variant.name}" is currently unavailable`,
+        );
+      }
       price = Number(variant.price);
     } else {
       // NAYA: agar variantId nahi diya, check karo ki is product ke variants exist toh nahi karte.
@@ -258,10 +271,14 @@ interface CreateConfirmedOrderInput {
   cartItemIds?: string[];
 }
 
-export async function createConfirmedOrderService(input: CreateConfirmedOrderInput) {
+export async function createConfirmedOrderService(
+  input: CreateConfirmedOrderInput,
+) {
   try {
     return await prisma.$transaction(async (tx) => {
-      const address = await tx.address.findUnique({ where: { id: input.addressId } });
+      const address = await tx.address.findUnique({
+        where: { id: input.addressId },
+      });
       if (!address || address.customerId !== input.customerId) {
         throw new Error("Address not found");
       }
@@ -273,7 +290,10 @@ export async function createConfirmedOrderService(input: CreateConfirmedOrderInp
       const resolvedItems = await resolveOrderItems(tx, input.items);
       await deductStock(tx, resolvedItems); // yahi step Razorpay mein PAYMENT SUCCESS ke baad hoga (COD mein order-create ke saath)
 
-      const subtotal = resolvedItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      const subtotal = resolvedItems.reduce(
+        (sum, i) => sum + i.price * i.quantity,
+        0,
+      );
 
       let discount = 0;
       let couponId: string | undefined;
@@ -336,18 +356,21 @@ export async function createConfirmedOrderService(input: CreateConfirmedOrderInp
       });
 
       if (input.payment.method === PaymentMethod.WALLET) {
-  // balance kam hua to poori transaction rollback: stock, coupon, order sab wapas
-  await debitWalletTx(tx, {
-    customerId: input.customerId,
-    amount: Number(total.toFixed(2)),
-    reason: `Order ${orderNumber}`,
-    orderId: order.id,
-  });
-}
+        // balance kam hua to poori transaction rollback: stock, coupon, order sab wapas
+        await debitWalletTx(tx, {
+          customerId: input.customerId,
+          amount: Number(total.toFixed(2)),
+          reason: `Order ${orderNumber}`,
+          orderId: order.id,
+        });
+      }
 
       if (input.cartItemIds && input.cartItemIds.length > 0) {
         await tx.cartItem.deleteMany({
-          where: { id: { in: input.cartItemIds }, cart: { customerId: input.customerId } },
+          where: {
+            id: { in: input.cartItemIds },
+            cart: { customerId: input.customerId },
+          },
         });
       }
 
@@ -408,7 +431,7 @@ export async function buildItemsWithTax(
 
 export async function createPosOrderService(data: CreatePosOrderInput) {
   return prisma.$transaction(async (tx) => {
-     // NAYA: cashier ki active OPEN shift check karo — bina shift ke billing nahi hogi
+    // NAYA: cashier ki active OPEN shift check karo — bina shift ke billing nahi hogi
     const activeShift = await tx.shift.findFirst({
       where: { cashierId: data.createdById, status: "OPEN" },
     });
@@ -475,9 +498,9 @@ export async function createPosOrderService(data: CreatePosOrderInput) {
         orderNumber,
         channel: "POS",
         status: "COMPLETED",
-        customerId:  customer.id,
+        customerId: customer.id,
         createdById: data.createdById,
-            shiftId: activeShift.id, // NAYA: order ko shift se link kiya
+        shiftId: activeShift.id, // NAYA: order ko shift se link kiya
         couponId,
         subtotal,
         tax: totalTax,
@@ -625,11 +648,11 @@ export async function previewOnlineOrderService(data: PreviewOrderInput) {
     inStock: itemsWithDetails[idx].inStock,
   }));
 
-const wallet = await prisma.wallet.findUnique({
-  where: { customerId: data.customerId },
-  select: { balance: true },
-});
-const walletBalance = Number(wallet?.balance ?? 0);
+  const wallet = await prisma.wallet.findUnique({
+    where: { customerId: data.customerId },
+    select: { balance: true },
+  });
+  const walletBalance = Number(wallet?.balance ?? 0);
 
   return {
     items: summaryItems,
@@ -764,35 +787,49 @@ export async function refundOrderService(
 
     if (order.isExchange) fail("Exchange orders cannot be refunded directly");
 
-const walletPaid = order.payments
-  .filter((p) => p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID)
-  .reduce((s, p) => s + Number(p.amount), 0);
+    const walletPaid = order.payments
+      .filter(
+        (p) =>
+          p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID,
+      )
+      .reduce((s, p) => s + Number(p.amount), 0);
 
-let method: PaymentMethod | undefined;
-if (walletPaid > 0) {
-  if (!order.customerId) fail("Order has no customer");
-  if (amount > walletPaid) fail(`Refund amount exceeds wallet-paid amount (${walletPaid})`);
-  method = PaymentMethod.WALLET;
-}
+    let method: PaymentMethod | undefined;
+    if (walletPaid > 0) {
+      if (!order.customerId) fail("Order has no customer");
+      if (amount > walletPaid)
+        fail(`Refund amount exceeds wallet-paid amount (${walletPaid})`);
+      method = PaymentMethod.WALLET;
+    }
 
-await restoreStock(tx, order.orderItems);
-await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
-if (order.payments.length > 0) {
-  await tx.payment.updateMany({ where: { orderId: id }, data: { status: "REFUNDED" } });
-}
+    await restoreStock(tx, order.orderItems);
+    await tx.order.update({ where: { id }, data: { status: "REFUNDED" } });
+    if (order.payments.length > 0) {
+      await tx.payment.updateMany({
+        where: { orderId: id },
+        data: { status: "REFUNDED" },
+      });
+    }
 
-const refund = await tx.refund.create({
-  data: { orderId: id, amount, method, reason, status: "COMPLETED", processedById },
-});
-if (method === PaymentMethod.WALLET) {
-  await creditWalletTx(tx, {
-    customerId: order.customerId!,
-    amount,
-    reason: `Order refund (${order.orderNumber})`,
-    orderId: id,
-  });
-}
-return refund;
+    const refund = await tx.refund.create({
+      data: {
+        orderId: id,
+        amount,
+        method,
+        reason,
+        status: "COMPLETED",
+        processedById,
+      },
+    });
+    if (method === PaymentMethod.WALLET) {
+      await creditWalletTx(tx, {
+        customerId: order.customerId!,
+        amount,
+        reason: `Order refund (${order.orderNumber})`,
+        orderId: id,
+      });
+    }
+    return refund;
   });
 }
 
@@ -810,7 +847,8 @@ export async function cancelOrderService(
     if (!order || order.customerId !== customerId) {
       throw new Error("Order not found");
     }
-    if (order.isExchange) fail("Exchange orders cannot be cancelled/refunded directly");
+    if (order.isExchange)
+      fail("Exchange orders cannot be cancelled/refunded directly");
 
     if (
       order.status === "CANCELLED" ||
@@ -822,42 +860,49 @@ export async function cancelOrderService(
       );
     }
 
-   if (order.isExchange) fail("Exchange orders cannot be cancelled directly");
+    if (order.isExchange) fail("Exchange orders cannot be cancelled directly");
 
-await restoreStock(tx, order.orderItems);
-await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
+    await restoreStock(tx, order.orderItems);
+    await tx.order.update({ where: { id }, data: { status: "CANCELLED" } });
 
-const walletPaid = order.payments
-  .filter((p) => p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID)
-  .reduce((s, p) => s + Number(p.amount), 0);
+    const walletPaid = order.payments
+      .filter(
+        (p) =>
+          p.method === PaymentMethod.WALLET && p.status === PaymentStatus.PAID,
+      )
+      .reduce((s, p) => s + Number(p.amount), 0);
 
-await tx.payment.updateMany({
-  where: { orderId: id, status: { not: PaymentStatus.PAID } },
-  data: { status: PaymentStatus.FAILED },
-});
-await tx.payment.updateMany({
-  where: { orderId: id, method: PaymentMethod.WALLET, status: PaymentStatus.PAID },
-  data: { status: PaymentStatus.REFUNDED },
-});
+    await tx.payment.updateMany({
+      where: { orderId: id, status: { not: PaymentStatus.PAID } },
+      data: { status: PaymentStatus.FAILED },
+    });
+    await tx.payment.updateMany({
+      where: {
+        orderId: id,
+        method: PaymentMethod.WALLET,
+        status: PaymentStatus.PAID,
+      },
+      data: { status: PaymentStatus.REFUNDED },
+    });
 
-const refund = await tx.refund.create({
-  data: {
-    orderId: id,
-    amount: walletPaid,
-    method: walletPaid > 0 ? PaymentMethod.WALLET : undefined,
-    reason,
-    status: "COMPLETED",
-  },
-});
-if (walletPaid > 0) {
-  await creditWalletTx(tx, {
-    customerId,
-    amount: walletPaid,
-    reason: `Order cancelled (${order.orderNumber})`,
-    orderId: id,
-  });
-}
-return refund;
+    const refund = await tx.refund.create({
+      data: {
+        orderId: id,
+        amount: walletPaid,
+        method: walletPaid > 0 ? PaymentMethod.WALLET : undefined,
+        reason,
+        status: "COMPLETED",
+      },
+    });
+    if (walletPaid > 0) {
+      await creditWalletTx(tx, {
+        customerId,
+        amount: walletPaid,
+        reason: `Order cancelled (${order.orderNumber})`,
+        orderId: id,
+      });
+    }
+    return refund;
   });
 }
 
@@ -866,7 +911,10 @@ return refund;
 // Frontend (POS Panel) isko HTML template mein render karke window.print() karega,
 // ya future mein PDF-generation library se convert kar sakta hai.
 
-export async function getOrderReceiptService(id: string, requestingCustomerId?: string) {
+export async function getOrderReceiptService(
+  id: string,
+  requestingCustomerId?: string,
+) {
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
@@ -889,7 +937,10 @@ export async function getOrderReceiptService(id: string, requestingCustomerId?: 
   }
 
   // customer khud call kar raha hai to check karo ye uska hi order hai
-  if (requestingCustomerId !== undefined && order.customerId !== requestingCustomerId) {
+  if (
+    requestingCustomerId !== undefined &&
+    order.customerId !== requestingCustomerId
+  ) {
     const err: any = new Error("You do not have access to this order");
     err.statusCode = 403;
     throw err;
@@ -946,7 +997,9 @@ interface PosOrderHistoryFilters {
   limit?: number;
 }
 
-export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters) {
+export async function getPosOrderHistoryService(
+  filters: PosOrderHistoryFilters,
+) {
   const page = filters.page && filters.page > 0 ? filters.page : 1;
   const limit = filters.limit && filters.limit > 0 ? filters.limit : 20;
 
@@ -1008,7 +1061,10 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
         quantity: i.quantity,
         returnedQty: i.returnedQty,
       })),
-      payments: o.payments.map((p) => ({ method: p.method, amount: Number(p.amount) })),
+      payments: o.payments.map((p) => ({
+        method: p.method,
+        amount: Number(p.amount),
+      })),
       total: Number(o.total),
       createdAt: o.createdAt,
     })),
@@ -1016,7 +1072,7 @@ export async function getPosOrderHistoryService(filters: PosOrderHistoryFilters)
   };
 }
 
-//shared function 
+//shared function
 export function paidValueForUnits(
   item: Pick<OrderItem, "subtotal" | "taxAmount" | "quantity">,
   order: Pick<Order, "subtotal" | "discount">,
@@ -1025,7 +1081,9 @@ export function paidValueForUnits(
   const itemSubtotal = Number(item.subtotal);
   const orderSubtotal = Number(order.subtotal);
   const discountShare =
-    orderSubtotal > 0 ? (Number(order.discount) * itemSubtotal) / orderSubtotal : 0;
+    orderSubtotal > 0
+      ? (Number(order.discount) * itemSubtotal) / orderSubtotal
+      : 0;
   const lineTotal = itemSubtotal + Number(item.taxAmount) - discountShare;
   return Number(((lineTotal / item.quantity) * qty).toFixed(2)); // paise-level rounding drift ho sakta hai
 }
@@ -1043,19 +1101,40 @@ export async function quoteExchange(
   },
 ) {
   const resolvedNewItems = await resolveOrderItems(tx, [
-    { productId: p.newProductId, variantId: p.newVariantId, quantity: p.quantity },
+    {
+      productId: p.newProductId,
+      variantId: p.newVariantId,
+      quantity: p.quantity,
+    },
   ]);
   const itemsWithTax = await buildItemsWithTax(
-    tx, resolvedNewItems, p.dest.country, p.dest.state, p.origin.country, p.origin.state,
+    tx,
+    resolvedNewItems,
+    p.dest.country,
+    p.dest.state,
+    p.origin.country,
+    p.origin.state,
   );
 
-  const newSubtotal = Number(itemsWithTax.reduce((s, i) => s + i.subtotal, 0).toFixed(2));
-  const newTax = Number(itemsWithTax.reduce((s, i) => s + i.taxAmount, 0).toFixed(2));
+  const newSubtotal = Number(
+    itemsWithTax.reduce((s, i) => s + i.subtotal, 0).toFixed(2),
+  );
+  const newTax = Number(
+    itemsWithTax.reduce((s, i) => s + i.taxAmount, 0).toFixed(2),
+  );
   const newItemTotal = Number((newSubtotal + newTax).toFixed(2));
   const originalValue = paidValueForUnits(p.originalItem, p.order, p.quantity);
   const priceDiff = Number((newItemTotal - originalValue).toFixed(2)); // naye item par koi discount nahi
 
-  return { resolvedNewItems, itemsWithTax, newSubtotal, newTax, newItemTotal, originalValue, priceDiff };
+  return {
+    resolvedNewItems,
+    itemsWithTax,
+    newSubtotal,
+    newTax,
+    newItemTotal,
+    originalValue,
+    priceDiff,
+  };
 }
 
 //for pos eligibility check
@@ -1071,27 +1150,36 @@ async function loadPosEligibleItem(
   if (!item) return fail("Original order item not found", 404);
   const order = item.order;
 
-  if (order.channel !== "POS") fail("Online orders cannot be exchanged at POS. Use the website return flow.");
-  if (order.status !== OrderStatus.COMPLETED) fail("Exchange is only allowed for completed orders");
+  if (order.channel !== "POS")
+    fail(
+      "Online orders cannot be exchanged at POS. Use the website return flow.",
+    );
+  if (order.status !== OrderStatus.COMPLETED)
+    fail("Exchange is only allowed for completed orders");
 
   const isReturnable =
     item.product.isReturnable ?? item.product.category?.isReturnable ?? true;
   if (!isReturnable) {
-    const policy = item.product.returnPolicyText ?? item.product.category?.returnPolicyText;
-    fail(`"${item.product.name}" is non-returnable.${policy ? ` Policy: ${policy}` : ""}`);
+    const policy =
+      item.product.returnPolicyText ?? item.product.category?.returnPolicyText;
+    fail(
+      `"${item.product.name}" is non-returnable.${policy ? ` Policy: ${policy}` : ""}`,
+    );
   }
 
   const settings = await tx.storeSettings.findFirst();
   const windowDays = settings?.returnWindowDays ?? DEFAULT_RETURN_WINDOW_DAYS;
   const windowEnd = new Date(order.createdAt);
   windowEnd.setDate(windowEnd.getDate() + windowDays);
-  if (new Date() > windowEnd) fail(`Return window of ${windowDays} days has expired`);
+  if (new Date() > windowEnd)
+    fail(`Return window of ${windowDays} days has expired`);
 
   const pending = await tx.returnRequest.aggregate({
     where: { orderItemId, status: { in: PENDING_RETURN_STATUSES } },
     _sum: { quantity: true },
   });
-  const available = item.quantity - item.returnedQty - (pending._sum.quantity ?? 0);
+  const available =
+    item.quantity - item.returnedQty - (pending._sum.quantity ?? 0);
   if (!Number.isInteger(quantity) || quantity <= 0 || quantity > available) {
     fail(`Invalid quantity — only ${available} unit(s) available to exchange`);
   }
@@ -1107,24 +1195,47 @@ export async function previewPosExchangeService(data: {
   newVariantId?: string;
 }) {
   const tx = prisma as unknown as Prisma.TransactionClient;
-  const { item, order, settings } = await loadPosEligibleItem(tx, data.orderItemId, data.quantity);
+  const { item, order, settings } = await loadPosEligibleItem(
+    tx,
+    data.orderItemId,
+    data.quantity,
+  );
   const country = settings?.country ?? "India";
   const state = settings?.state ?? "";
 
   const q = await quoteExchange(tx, {
-    originalItem: item, order, quantity: data.quantity,
-    newProductId: data.newProductId, newVariantId: data.newVariantId,
-    dest: { country, state }, origin: { country, state },
+    originalItem: item,
+    order,
+    quantity: data.quantity,
+    newProductId: data.newProductId,
+    newVariantId: data.newVariantId,
+    dest: { country, state },
+    origin: { country, state },
   });
 
   const r = q.resolvedNewItems[0];
   const stock = r.variantId
-    ? (await tx.productVariant.findUnique({ where: { id: r.variantId }, select: { stock: true } }))?.stock
-    : (await tx.product.findUnique({ where: { id: r.productId }, select: { stock: true } }))?.stock;
+    ? (
+        await tx.productVariant.findUnique({
+          where: { id: r.variantId },
+          select: { stock: true },
+        })
+      )?.stock
+    : (
+        await tx.product.findUnique({
+          where: { id: r.productId },
+          select: { stock: true },
+        })
+      )?.stock;
 
   return {
     originalValue: q.originalValue,
-    newItem: { productName: r.productName, subtotal: q.newSubtotal, tax: q.newTax, total: q.newItemTotal },
+    newItem: {
+      productName: r.productName,
+      subtotal: q.newSubtotal,
+      tax: q.newTax,
+      total: q.newItemTotal,
+    },
     priceDiff: q.priceDiff,
     amount: Math.abs(q.priceDiff),
     action: q.priceDiff > 0 ? "COLLECT" : q.priceDiff < 0 ? "REFUND" : "NONE",
@@ -1137,17 +1248,27 @@ export async function instantPosExchangeService(data: InstantExchangeInput) {
     const activeShift = await tx.shift.findFirst({
       where: { cashierId: data.createdById, status: "OPEN" },
     });
-    if (!activeShift) return fail("Please open a shift before processing an exchange");
+    if (!activeShift)
+      return fail("Please open a shift before processing an exchange");
 
-    const { item, order, settings } = await loadPosEligibleItem(tx, data.orderItemId, data.quantity);
-    const customerId = order.customerId ?? fail("Original order has no customer");
+    const { item, order, settings } = await loadPosEligibleItem(
+      tx,
+      data.orderItemId,
+      data.quantity,
+    );
+    const customerId =
+      order.customerId ?? fail("Original order has no customer");
 
     // concurrent exchange guard
     const marked = await tx.orderItem.updateMany({
       where: { id: item.id, returnedQty: item.returnedQty },
       data: { returnedQty: { increment: data.quantity } },
     });
-    if (marked.count === 0) return fail("This item was just updated by another request. Please retry.", 409);
+    if (marked.count === 0)
+      return fail(
+        "This item was just updated by another request. Please retry.",
+        409,
+      );
 
     // purane item ka stock wapas
     if (item.variantId) {
@@ -1165,9 +1286,13 @@ export async function instantPosExchangeService(data: InstantExchangeInput) {
     const country = settings?.country ?? "India";
     const state = settings?.state ?? "";
     const quote = await quoteExchange(tx, {
-      originalItem: item, order, quantity: data.quantity,
-      newProductId: data.newProductId, newVariantId: data.newVariantId,
-      dest: { country, state }, origin: { country, state },
+      originalItem: item,
+      order,
+      quantity: data.quantity,
+      newProductId: data.newProductId,
+      newVariantId: data.newVariantId,
+      dest: { country, state },
+      origin: { country, state },
     });
     await deductStock(tx, quote.resolvedNewItems);
 
@@ -1175,14 +1300,20 @@ export async function instantPosExchangeService(data: InstantExchangeInput) {
     let settlement: ExchangeSettlement = ExchangeSettlement.NONE;
 
     if (priceDiff > 0) {
-      if (!data.payments?.length) return fail(`New item is costlier by ₹${priceDiff}. Payment is required.`);
+      if (!data.payments?.length)
+        return fail(
+          `New item is costlier by ₹${priceDiff}. Payment is required.`,
+        );
       const paid = data.payments.reduce((s, p) => s + p.amount, 0);
       if (Math.round(paid * 100) !== Math.round(priceDiff * 100)) {
-        return fail(`Payment amount (${paid}) does not match price difference (${priceDiff})`);
+        return fail(
+          `Payment amount (${paid}) does not match price difference (${priceDiff})`,
+        );
       }
       settlement = ExchangeSettlement.COLLECT_AT_COUNTER;
     } else {
-      if (data.payments?.length) return fail("No payment is expected for this exchange");
+      if (data.payments?.length)
+        return fail("No payment is expected for this exchange");
       if (priceDiff < 0) settlement = ExchangeSettlement.REFUND_AT_COUNTER;
     }
 
@@ -1265,4 +1396,3 @@ export async function instantPosExchangeService(data: InstantExchangeInput) {
     return { exchangeOrder, refund, priceDiff, returnRequestId: record.id };
   });
 }
-

@@ -1,4 +1,4 @@
-import prisma from "../../config/db.js"; // apna actual prisma client import path daalo
+import prisma from "../../config/db.js";
 
 // ==================== GET PROFILE ====================
 export async function getProfile(customerId: string) {
@@ -61,7 +61,9 @@ export async function updateProfile(customerId: string, body: any) {
 
 // ==================== DELETE PROFILE (HARD DELETE) ====================
 export async function deleteProfile(customerId: string) {
-  const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+  });
 
   if (!customer) {
     const err: any = new Error("Customer not found");

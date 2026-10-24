@@ -14,7 +14,9 @@ export async function listReturns(req: Request, res: Response) {
     });
     res.status(200).json({ success: true, ...result });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
@@ -23,25 +25,38 @@ export async function getReturnById(req: Request, res: Response) {
     const data = await service.getReturnById(getParam(req.params.id));
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function approveReturn(req: Request, res: Response) {
   try {
-    const data = await service.approveReturn(getParam(req.params.id), req.user!.id);
+    const data = await service.approveReturn(
+      getParam(req.params.id),
+      req.user!.id,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function rejectReturn(req: Request, res: Response) {
   try {
-    const data = await service.rejectReturn(getParam(req.params.id), req.user!.id, req.body.reasonNote);
+    const data = await service.rejectReturn(
+      getParam(req.params.id),
+      req.user!.id,
+      req.body.reasonNote,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
@@ -50,7 +65,9 @@ export async function schedulePickup(req: Request, res: Response) {
     const data = await service.schedulePickup(getParam(req.params.id));
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
@@ -59,32 +76,47 @@ export async function markReceived(req: Request, res: Response) {
     const data = await service.markReceived(getParam(req.params.id));
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function processRefund(req: Request, res: Response) {
   try {
-    const data = await service.processRefund(getParam(req.params.id), req.user!.id);
+    const data = await service.processRefund(
+      getParam(req.params.id),
+      req.user!.id,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function processExchange(req: Request, res: Response) {
   try {
-    const data = await service.processExchange(getParam(req.params.id), req.user!.id);
+    const data = await service.processExchange(
+      getParam(req.params.id),
+      req.user!.id,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function listPayouts(req: Request, res: Response) {
   try {
     const { status, page, limit } = req.query;
-    if (status && !["PENDING", "FAILED", "COMPLETED"].includes(status as string)) {
+    if (
+      status &&
+      !["PENDING", "FAILED", "COMPLETED"].includes(status as string)
+    ) {
       res.status(400).json({ success: false, message: "Invalid status" });
       return;
     }
@@ -95,24 +127,38 @@ export async function listPayouts(req: Request, res: Response) {
     });
     res.status(200).json({ success: true, ...result });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function completePayout(req: Request, res: Response) {
   try {
-    const data = await service.completePayout(getParam(req.params.refundId), req.user!.id, req.body.transactionRef);
+    const data = await service.completePayout(
+      getParam(req.params.refundId),
+      req.user!.id,
+      req.body.transactionRef,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function failPayout(req: Request, res: Response) {
   try {
-    const data = await service.failPayout(getParam(req.params.refundId), req.user!.id, req.body.reason);
+    const data = await service.failPayout(
+      getParam(req.params.refundId),
+      req.user!.id,
+      req.body.reason,
+    );
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }

@@ -1,5 +1,11 @@
 import prisma from "../../config/db.js";
-import { OrderStatus, OrderChannel, ReturnType, ReturnStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  OrderChannel,
+  ReturnType,
+  ReturnStatus,
+  Prisma,
+} from "@prisma/client";
 
 interface DailySalesFilters {
   from?: string;
@@ -34,16 +40,16 @@ export async function getDailySalesReportService(filters: DailySalesFilters) {
     effectiveCashierId = filters.cashierId;
   }
 
-const baseOrderWhere: any = {
-  createdAt: { gte: start, lte: end },
-  status: { not: OrderStatus.CANCELLED },
-};
-if (effectiveCashierId) {
-  baseOrderWhere.createdById = effectiveCashierId;
-}
+  const baseOrderWhere: any = {
+    createdAt: { gte: start, lte: end },
+    status: { not: OrderStatus.CANCELLED },
+  };
+  if (effectiveCashierId) {
+    baseOrderWhere.createdById = effectiveCashierId;
+  }
 
-// exchange orders ka poora total sales mein nahi gina jaata, sirf priceDiff (neeche exchangeAdjustment)
-const orderWhere = { ...baseOrderWhere, isExchange: false };
+  // exchange orders ka poora total sales mein nahi gina jaata, sirf priceDiff (neeche exchangeAdjustment)
+  const orderWhere = { ...baseOrderWhere, isExchange: false };
 
   // ---- 1. Overall totals ----
   const orders = await prisma.order.findMany({
@@ -55,48 +61,52 @@ const orderWhere = { ...baseOrderWhere, isExchange: false };
   const grossSales = orders.reduce((sum, o) => sum + Number(o.total), 0);
 
   // ---- 2. Refunds in this range (net sales ke liye) ----
-const refunds = await prisma.refund.findMany({
-  where: {
-    createdAt: { gte: start, lte: end },
-    OR: [{ returnRequestId: null }, { returnRequest: { type: ReturnType.RETURN } }],
-    // cancelled order sales mein hai hi nahi, uska refund dobara minus nahi hona chahiye
-    order: {
-      status: { not: OrderStatus.CANCELLED },
-      ...(effectiveCashierId ? { createdById: effectiveCashierId } : {}),
-    },
-  },
-  select: { amount: true },
-});
-const totalRefunds = refunds.reduce((sum, r) => sum + Number(r.amount), 0);
-
-// exchange = purane item ki return + naya sale, net asar sirf priceDiff
-const exchanges = await prisma.returnRequest.findMany({
-  where: {
-    type: ReturnType.EXCHANGE,
-    status: ReturnStatus.EXCHANGED,
-    exchangeOrder: {
+  const refunds = await prisma.refund.findMany({
+    where: {
       createdAt: { gte: start, lte: end },
-      ...(effectiveCashierId ? { createdById: effectiveCashierId } : {}),
+      OR: [
+        { returnRequestId: null },
+        { returnRequest: { type: ReturnType.RETURN } },
+      ],
+      // cancelled order sales mein hai hi nahi, uska refund dobara minus nahi hona chahiye
+      order: {
+        status: { not: OrderStatus.CANCELLED },
+        ...(effectiveCashierId ? { createdById: effectiveCashierId } : {}),
+      },
     },
-  },
-  select: { priceDiff: true },
-});
-const exchangeAdjustment = Number(
-  exchanges.reduce((sum, e) => sum + Number(e.priceDiff ?? 0), 0).toFixed(2),
-);
+    select: { amount: true },
+  });
+  const totalRefunds = refunds.reduce((sum, r) => sum + Number(r.amount), 0);
 
-const netSales = grossSales - totalRefunds + exchangeAdjustment;
+  // exchange = purane item ki return + naya sale, net asar sirf priceDiff
+  const exchanges = await prisma.returnRequest.findMany({
+    where: {
+      type: ReturnType.EXCHANGE,
+      status: ReturnStatus.EXCHANGED,
+      exchangeOrder: {
+        createdAt: { gte: start, lte: end },
+        ...(effectiveCashierId ? { createdById: effectiveCashierId } : {}),
+      },
+    },
+    select: { priceDiff: true },
+  });
+  const exchangeAdjustment = Number(
+    exchanges.reduce((sum, e) => sum + Number(e.priceDiff ?? 0), 0).toFixed(2),
+  );
+
+  const netSales = grossSales - totalRefunds + exchangeAdjustment;
   // ---- 3. Payment method-wise breakdown ----
   // Payment table ko Order ke through filter kiya — split payment ki wajah se
   // ek order ke multiple Payment records ho sakte hain, isliye Order-level total se nahi,
   // Payment-level se hi accurate cash/card/upi split milega.
- const payments = await prisma.payment.findMany({
-  where: { order: baseOrderWhere },
-  select: { method: true, amount: true },
-});
+  const payments = await prisma.payment.findMany({
+    where: { order: baseOrderWhere },
+    select: { method: true, amount: true },
+  });
   const paymentBreakdown: Record<string, number> = {};
   for (const p of payments) {
-    paymentBreakdown[p.method] = (paymentBreakdown[p.method] ?? 0) + Number(p.amount);
+    paymentBreakdown[p.method] =
+      (paymentBreakdown[p.method] ?? 0) + Number(p.amount);
   }
 
   // ---- 4. Channel-wise (POS vs Online) ----
@@ -112,7 +122,12 @@ const netSales = grossSales - totalRefunds + exchangeAdjustment;
   // ---- 5. Cashier-wise breakdown ----
   // Sirf tab compute karo jab Manager/Admin dekh raha ho aur specific cashier filter nahi diya —
   // taaki poori team ka comparison mile. Cashier khud apna dekh raha ho to ye section skip.
-  let cashierBreakdown: { cashierId: string; cashierName: string; totalSales: number; orderCount: number }[] = [];
+  let cashierBreakdown: {
+    cashierId: string;
+    cashierName: string;
+    totalSales: number;
+    orderCount: number;
+  }[] = [];
 
   if (filters.requestingUserRole !== "CASHIER" && !filters.cashierId) {
     const grouped = await prisma.order.groupBy({
@@ -122,7 +137,9 @@ const netSales = grossSales - totalRefunds + exchangeAdjustment;
       _count: { id: true },
     });
 
-    const cashierIds = grouped.map((g) => g.createdById).filter((id): id is string => !!id);
+    const cashierIds = grouped
+      .map((g) => g.createdById)
+      .filter((id): id is string => !!id);
     const cashiers = await prisma.user.findMany({
       where: { id: { in: cashierIds } },
       select: { id: true, name: true },
@@ -139,17 +156,17 @@ const netSales = grossSales - totalRefunds + exchangeAdjustment;
       }));
   }
 
-return {
-  dateRange: { from: start, to: end },
-  totalOrders,
-  grossSales,
-  totalRefunds,
-  exchangeAdjustment,
-  netSales,
-  paymentBreakdown,
-  channelBreakdown,
-  cashierBreakdown,
-};
+  return {
+    dateRange: { from: start, to: end },
+    totalOrders,
+    grossSales,
+    totalRefunds,
+    exchangeAdjustment,
+    netSales,
+    paymentBreakdown,
+    channelBreakdown,
+    cashierBreakdown,
+  };
 }
 
 interface ReturnsReportFilters {
@@ -210,12 +227,21 @@ export async function getReturnsExchangeReportService(f: ReturnsReportFilters) {
 
   const summary = {
     returns: { count: 0, units: 0, refunded: 0 },
-    exchanges: { count: 0, units: 0, collected: 0, returnedToCustomer: 0, netDiff: 0 },
+    exchanges: {
+      count: 0,
+      units: 0,
+      collected: 0,
+      returnedToCustomer: 0,
+      netDiff: 0,
+    },
   };
   const bySettlement: Record<string, { count: number; amount: number }> = {};
   const byChannel: Record<string, number> = {};
   const byReason: Record<string, number> = {};
-  const products = new Map<string, { productId: string; name: string; units: number; count: number }>();
+  const products = new Map<
+    string,
+    { productId: string; name: string; units: number; count: number }
+  >();
 
   for (const r of rows) {
     const channel = r.orderItem.order.channel;
@@ -256,26 +282,31 @@ export async function getReturnsExchangeReportService(f: ReturnsReportFilters) {
   }
 
   // Full-order refunds (refundOrder) ReturnRequest nahi hote, wo alag se
-  let orderRefunds = { count: 0, total: 0, byMethod: {} as Record<string, number> };
+  let orderRefunds = {
+    count: 0,
+    total: 0,
+    byMethod: {} as Record<string, number>,
+  };
   if (!f.type) {
-  const refunds = await prisma.refund.findMany({
-  where: {
-    returnRequestId: null,
-    amount: { gt: 0 },
-    createdAt: { gte: start, lte: end },
-    ...(isCashier ? { processedById: f.requestingUserId } : {}),
-    order: {
-      status: { not: OrderStatus.CANCELLED },
-      ...(f.channel ? { channel: f.channel } : {}),
-    },
-  },
-  select: { amount: true, method: true },
-});
+    const refunds = await prisma.refund.findMany({
+      where: {
+        returnRequestId: null,
+        amount: { gt: 0 },
+        createdAt: { gte: start, lte: end },
+        ...(isCashier ? { processedById: f.requestingUserId } : {}),
+        order: {
+          status: { not: OrderStatus.CANCELLED },
+          ...(f.channel ? { channel: f.channel } : {}),
+        },
+      },
+      select: { amount: true, method: true },
+    });
     for (const r of refunds) {
       orderRefunds.count += 1;
       orderRefunds.total += Number(r.amount);
       const m = r.method ?? "UNSPECIFIED";
-      orderRefunds.byMethod[m] = (orderRefunds.byMethod[m] ?? 0) + Number(r.amount);
+      orderRefunds.byMethod[m] =
+        (orderRefunds.byMethod[m] ?? 0) + Number(r.amount);
     }
   }
 
@@ -287,7 +318,10 @@ export async function getReturnsExchangeReportService(f: ReturnsReportFilters) {
   return {
     dateRange: { from: start, to: end },
     summary: {
-      returns: { ...summary.returns, refunded: round(summary.returns.refunded) },
+      returns: {
+        ...summary.returns,
+        refunded: round(summary.returns.refunded),
+      },
       exchanges: {
         ...summary.exchanges,
         collected: round(summary.exchanges.collected),
@@ -300,7 +334,9 @@ export async function getReturnsExchangeReportService(f: ReturnsReportFilters) {
     bySettlement,
     byChannel,
     byReason,
-    topProducts: [...products.values()].sort((a, b) => b.units - a.units).slice(0, 10),
+    topProducts: [...products.values()]
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 10),
     items: rows.slice((page - 1) * limit, page * limit).map((r) => ({
       id: r.id,
       type: r.type,
@@ -320,8 +356,11 @@ export async function getReturnsExchangeReportService(f: ReturnsReportFilters) {
       refundAmount: r.refund ? Number(r.refund.amount) : null,
       refundMethod: r.refund?.method ?? null,
     })),
-    pagination: { page, limit, total: rows.length, totalPages: Math.ceil(rows.length / limit) },
+    pagination: {
+      page,
+      limit,
+      total: rows.length,
+      totalPages: Math.ceil(rows.length / limit),
+    },
   };
 }
-
-

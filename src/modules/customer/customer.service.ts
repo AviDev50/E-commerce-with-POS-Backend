@@ -1,7 +1,11 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../../config/db.js";
-import { generateRefreshToken, hashToken, getRefreshTokenExpiry } from "../../utils/refreshToken.js";
+import {
+  generateRefreshToken,
+  hashToken,
+  getRefreshTokenExpiry,
+} from "../../utils/refreshToken.js";
 //import {Gender} from "@prisma/client"
 
 interface RegisterInput {
@@ -19,17 +23,20 @@ interface LoginInput {
 }
 
 function generateAccessToken(id: string): string {
-  return jwt.sign(
-    { id, type: "customer" },
-    process.env.JWT_SECRET as string,
-    { expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN || "15m") as jwt.SignOptions["expiresIn"] }
-  );
+  return jwt.sign({ id, type: "customer" }, process.env.JWT_SECRET as string, {
+    expiresIn: (process.env.ACCESS_TOKEN_EXPIRES_IN ||
+      "15m") as jwt.SignOptions["expiresIn"],
+  });
 }
 
 export async function registerCustomerService(data: RegisterInput) {
-  const existing = await prisma.customer.findUnique({ where: { phone: data.phone } });
+  const existing = await prisma.customer.findUnique({
+    where: { phone: data.phone },
+  });
   if (existing) {
-    const err: any = new Error("Customer with this phone number already exists");
+    const err: any = new Error(
+      "Customer with this phone number already exists",
+    );
     err.statusCode = 409;
     throw err;
   }
@@ -58,16 +65,23 @@ export async function registerCustomerService(data: RegisterInput) {
 }
 
 export async function loginCustomerService(data: LoginInput) {
-  const customer = await prisma.customer.findUnique({ where: { phone: data.phone } });
+  const customer = await prisma.customer.findUnique({
+    where: { phone: data.phone },
+  });
   if (!customer) {
     throw new Error("Invalid phone number or password");
   }
 
-    if (!customer.password) {
-    throw new Error("This account has no password set. Please complete registration first.");
+  if (!customer.password) {
+    throw new Error(
+      "This account has no password set. Please complete registration first.",
+    );
   }
 
-  const isPasswordValid = await bcrypt.compare(data.password, customer.password);
+  const isPasswordValid = await bcrypt.compare(
+    data.password,
+    customer.password,
+  );
   if (!isPasswordValid) {
     throw new Error("Invalid phone number or password");
   }
@@ -84,10 +98,16 @@ export async function loginCustomerService(data: LoginInput) {
   });
 
   const { password, ...customerWithoutPassword } = customer;
-  return { customer: customerWithoutPassword, accessToken, refreshToken: rawRefreshToken };
+  return {
+    customer: customerWithoutPassword,
+    accessToken,
+    refreshToken: rawRefreshToken,
+  };
 }
 
-export async function refreshCustomerAccessTokenService(rawRefreshToken: string) {
+export async function refreshCustomerAccessTokenService(
+  rawRefreshToken: string,
+) {
   const tokenHash = hashToken(rawRefreshToken);
 
   const stored = await prisma.refreshToken.findUnique({
@@ -95,11 +115,19 @@ export async function refreshCustomerAccessTokenService(rawRefreshToken: string)
     include: { customer: true },
   });
 
-  if (!stored || stored.revoked || stored.expiresAt < new Date() || !stored.customer) {
+  if (
+    !stored ||
+    stored.revoked ||
+    stored.expiresAt < new Date() ||
+    !stored.customer
+  ) {
     throw new Error("Invalid or expired refresh token");
   }
 
-  await prisma.refreshToken.update({ where: { id: stored.id }, data: { revoked: true } });
+  await prisma.refreshToken.update({
+    where: { id: stored.id },
+    data: { revoked: true },
+  });
 
   const newRawRefreshToken = generateRefreshToken();
   await prisma.refreshToken.create({

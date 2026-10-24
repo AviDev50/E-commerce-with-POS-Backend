@@ -6,21 +6,31 @@ import {
   PaymentStatus,
   RefundStatus,
   OrderChannel,
-  Prisma, 
-  PaymentMethod, 
+  Prisma,
+  PaymentMethod,
   ExchangeSettlement,
-  RefundDestination 
+  RefundDestination,
 } from "@prisma/client";
 import { fail } from "../../utils/fail.js";
 import { formatReturnResponse } from "../../utils/returnFormat.js";
 import { generateOrderNumber } from "../../utils/orderNumberGenerator.js";
 import { creditWalletTx } from "../wallet/wallet.service.js";
-import { paidValueForUnits, quoteExchange, deductStock } from "../order/order.service.js";
+import {
+  paidValueForUnits,
+  quoteExchange,
+  deductStock,
+} from "../order/order.service.js";
 
 // Explicit ReturnStatus[] typing — warna TS inline array literal ko
 // narrow ("REQUESTED"|"APPROVED")[] type de deta hai aur .includes() mismatch deta hai
-const REJECTABLE_STATUSES: ReturnStatus[] = [ReturnStatus.REQUESTED, ReturnStatus.APPROVED];
-const RECEIVABLE_STATUSES: ReturnStatus[] = [ReturnStatus.APPROVED, ReturnStatus.PICKUP_SCHEDULED];
+const REJECTABLE_STATUSES: ReturnStatus[] = [
+  ReturnStatus.REQUESTED,
+  ReturnStatus.APPROVED,
+];
+const RECEIVABLE_STATUSES: ReturnStatus[] = [
+  ReturnStatus.APPROVED,
+  ReturnStatus.PICKUP_SCHEDULED,
+];
 
 interface ListReturnsFilters {
   status?: ReturnStatus;
@@ -45,11 +55,15 @@ export async function listReturns(filters: ListReturnsFilters) {
           include: {
             product: { select: { id: true, name: true, images: true } },
             variant: { select: { id: true, name: true, images: true } },
-            order: { select: { id: true, orderNumber: true, deliveredAt: true } },
+            order: {
+              select: { id: true, orderNumber: true, deliveredAt: true },
+            },
           },
         },
         customer: { select: { id: true, name: true, phone: true } },
-        exchangeVariant: { select: { id: true, name: true, price: true, images: true } },
+        exchangeVariant: {
+          select: { id: true, name: true, price: true, images: true },
+        },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
@@ -96,7 +110,9 @@ export async function approveReturn(id: string, adminId: string) {
   }
 
   if (existing.status !== ReturnStatus.REQUESTED) {
-    const error: any = new Error(`Cannot approve a return in ${existing.status} status`);
+    const error: any = new Error(
+      `Cannot approve a return in ${existing.status} status`,
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -108,7 +124,11 @@ export async function approveReturn(id: string, adminId: string) {
 }
 
 // ==================== REJECT ====================
-export async function rejectReturn(id: string, adminId: string, reasonNote?: string) {
+export async function rejectReturn(
+  id: string,
+  adminId: string,
+  reasonNote?: string,
+) {
   const existing = await prisma.returnRequest.findUnique({ where: { id } });
   if (!existing) {
     const error: any = new Error("Return request not found");
@@ -116,8 +136,10 @@ export async function rejectReturn(id: string, adminId: string, reasonNote?: str
     throw error;
   }
 
- if (!REJECTABLE_STATUSES.includes(existing.status)) {
-    const error: any = new Error(`Cannot reject a return in ${existing.status} status`);
+  if (!REJECTABLE_STATUSES.includes(existing.status)) {
+    const error: any = new Error(
+      `Cannot reject a return in ${existing.status} status`,
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -142,7 +164,9 @@ export async function schedulePickup(id: string) {
   }
 
   if (existing.status !== ReturnStatus.APPROVED) {
-    const error: any = new Error("Return must be approved before scheduling pickup");
+    const error: any = new Error(
+      "Return must be approved before scheduling pickup",
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -168,7 +192,9 @@ export async function markReceived(id: string) {
     }
 
     if (!RECEIVABLE_STATUSES.includes(existing.status)) {
-      const error: any = new Error(`Cannot mark received from ${existing.status} status`);
+      const error: any = new Error(
+        `Cannot mark received from ${existing.status} status`,
+      );
       error.statusCode = 400;
       throw error;
     }
@@ -206,16 +232,24 @@ export async function processRefund(id: string, adminId: string) {
       include: { orderItem: { include: { order: true } }, refund: true },
     });
     if (!existing) return fail("Return request not found", 404);
-    if (existing.type !== ReturnType.RETURN) return fail("This is an exchange request, use the exchange endpoint");
-    if (existing.status !== ReturnStatus.RECEIVED) return fail("Item must be received before refund can be processed");
-    if (existing.refund) return fail("Refund already processed for this return");
+    if (existing.type !== ReturnType.RETURN)
+      return fail("This is an exchange request, use the exchange endpoint");
+    if (existing.status !== ReturnStatus.RECEIVED)
+      return fail("Item must be received before refund can be processed");
+    if (existing.refund)
+      return fail("Refund already processed for this return");
 
     const { orderItem } = existing;
-    const amount = paidValueForUnits(orderItem, orderItem.order, existing.quantity);
+    const amount = paidValueForUnits(
+      orderItem,
+      orderItem.order,
+      existing.quantity,
+    );
 
     // UPI: refund PENDING banta hai, admin manually bhejta hai; request tab REFUNDED hogi jab payout COMPLETED ho
     if (existing.refundTo === RefundDestination.UPI) {
-      if (!existing.payoutMethodId) return fail("Customer has not provided a payout method");
+      if (!existing.payoutMethodId)
+        return fail("Customer has not provided a payout method");
       const refund = await tx.refund.create({
         data: {
           orderId: orderItem.orderId,
@@ -230,7 +264,10 @@ export async function processRefund(id: string, adminId: string) {
       });
       await tx.returnRequest.update({
         where: { id },
-        data: { originalValue: amount, settlement: ExchangeSettlement.UPI_TRANSFER },
+        data: {
+          originalValue: amount,
+          settlement: ExchangeSettlement.UPI_TRANSFER,
+        },
       });
       return refund;
     }
@@ -255,7 +292,11 @@ export async function processRefund(id: string, adminId: string) {
     });
     await tx.returnRequest.update({
       where: { id },
-      data: { status: ReturnStatus.REFUNDED, originalValue: amount, settlement: ExchangeSettlement.WALLET_CREDIT },
+      data: {
+        status: ReturnStatus.REFUNDED,
+        originalValue: amount,
+        settlement: ExchangeSettlement.WALLET_CREDIT,
+      },
     });
     return refund;
   });
@@ -266,11 +307,15 @@ export async function processExchange(id: string, adminId: string) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.returnRequest.findUnique({
       where: { id },
-      include: { orderItem: { include: { order: { include: { address: true } } } } },
+      include: {
+        orderItem: { include: { order: { include: { address: true } } } },
+      },
     });
     if (!existing) return fail("Return request not found", 404);
-    if (existing.type !== ReturnType.EXCHANGE) return fail("This is a return request, use the refund endpoint");
-    if (existing.status !== ReturnStatus.RECEIVED) return fail("Item must be received before exchange can be processed");
+    if (existing.type !== ReturnType.EXCHANGE)
+      return fail("This is a return request, use the refund endpoint");
+    if (existing.status !== ReturnStatus.RECEIVED)
+      return fail("Item must be received before exchange can be processed");
 
     const { orderItem } = existing;
     const order = orderItem.order;
@@ -284,7 +329,10 @@ export async function processExchange(id: string, adminId: string) {
       newProductId: existing.exchangeProductId ?? orderItem.productId, // purani requests: same product
       newVariantId: existing.exchangeVariantId ?? undefined,
       dest: { country: address.country, state: address.state },
-      origin: { country: settings?.country ?? null, state: settings?.state ?? null },
+      origin: {
+        country: settings?.country ?? null,
+        state: settings?.state ?? null,
+      },
     });
     await deductStock(tx, quote.resolvedNewItems);
 
@@ -317,7 +365,15 @@ export async function processExchange(id: string, adminId: string) {
         // mehenga item: diff delivery par COD se
         payments:
           priceDiff > 0
-            ? { create: [{ method: PaymentMethod.COD, status: PaymentStatus.PENDING, amount: priceDiff }] }
+            ? {
+                create: [
+                  {
+                    method: PaymentMethod.COD,
+                    status: PaymentStatus.PENDING,
+                    amount: priceDiff,
+                  },
+                ],
+              }
             : undefined,
       },
     });
@@ -325,45 +381,46 @@ export async function processExchange(id: string, adminId: string) {
     let settlement: ExchangeSettlement = ExchangeSettlement.NONE;
     if (priceDiff > 0) settlement = ExchangeSettlement.COLLECT_ON_DELIVERY;
 
-if (priceDiff < 0) {
-  const amount = Math.abs(priceDiff);
+    if (priceDiff < 0) {
+      const amount = Math.abs(priceDiff);
 
-  if (existing.refundTo === RefundDestination.UPI) {
-    if (!existing.payoutMethodId) return fail("Customer has not provided a payout method");
-    await tx.refund.create({
-      data: {
-        orderId: orderItem.orderId,
-        amount,
-        method: PaymentMethod.UPI,
-        reason: `Exchange price difference (${orderNumber})`,
-        status: RefundStatus.PENDING,
-        processedById: adminId,
-        returnRequestId: id,
-        payoutMethodId: existing.payoutMethodId,
-      },
-    });
-    settlement = ExchangeSettlement.UPI_TRANSFER;
-  } else {
-    await tx.refund.create({
-      data: {
-        orderId: orderItem.orderId,
-        amount,
-        method: PaymentMethod.WALLET,
-        reason: `Exchange price difference credited to wallet (${orderNumber})`,
-        status: RefundStatus.COMPLETED,
-        processedById: adminId,
-        returnRequestId: id,
-      },
-    });
-    await creditWalletTx(tx, {
-      customerId: existing.customerId,
-      amount,
-      reason: `Exchange difference (${orderNumber})`,
-      returnRequestId: id,
-    });
-    settlement = ExchangeSettlement.WALLET_CREDIT;
-  }
-}
+      if (existing.refundTo === RefundDestination.UPI) {
+        if (!existing.payoutMethodId)
+          return fail("Customer has not provided a payout method");
+        await tx.refund.create({
+          data: {
+            orderId: orderItem.orderId,
+            amount,
+            method: PaymentMethod.UPI,
+            reason: `Exchange price difference (${orderNumber})`,
+            status: RefundStatus.PENDING,
+            processedById: adminId,
+            returnRequestId: id,
+            payoutMethodId: existing.payoutMethodId,
+          },
+        });
+        settlement = ExchangeSettlement.UPI_TRANSFER;
+      } else {
+        await tx.refund.create({
+          data: {
+            orderId: orderItem.orderId,
+            amount,
+            method: PaymentMethod.WALLET,
+            reason: `Exchange price difference credited to wallet (${orderNumber})`,
+            status: RefundStatus.COMPLETED,
+            processedById: adminId,
+            returnRequestId: id,
+          },
+        });
+        await creditWalletTx(tx, {
+          customerId: existing.customerId,
+          amount,
+          reason: `Exchange difference (${orderNumber})`,
+          returnRequestId: id,
+        });
+        settlement = ExchangeSettlement.WALLET_CREDIT;
+      }
+    }
     await tx.returnRequest.update({
       where: { id },
       data: {
@@ -381,14 +438,20 @@ if (priceDiff < 0) {
   });
 }
 
-export async function listPayouts(filters: { status?: RefundStatus; page?: number; limit?: number }) {
+export async function listPayouts(filters: {
+  status?: RefundStatus;
+  page?: number;
+  limit?: number;
+}) {
   const page = filters.page && filters.page > 0 ? filters.page : 1;
   const limit = filters.limit && filters.limit > 0 ? filters.limit : 20;
 
   // payoutMethodId sirf is feature ke refunds par hota hai (POS counter refunds bahar)
   const where: Prisma.RefundWhereInput = {
     payoutMethodId: { not: null },
-    status: filters.status ?? { in: [RefundStatus.PENDING, RefundStatus.FAILED] },
+    status: filters.status ?? {
+      in: [RefundStatus.PENDING, RefundStatus.FAILED],
+    },
   };
 
   const [rows, total] = await Promise.all([
@@ -440,13 +503,22 @@ export async function listPayouts(filters: { status?: RefundStatus; page?: numbe
   };
 }
 
-export async function completePayout(refundId: string, adminId: string, transactionRef: string) {
+export async function completePayout(
+  refundId: string,
+  adminId: string,
+  transactionRef: string,
+) {
   const ref = String(transactionRef ?? "").trim();
-  if (ref.length < 6) return fail("transactionRef (UTR) is required, at least 6 characters");
+  if (ref.length < 6)
+    return fail("transactionRef (UTR) is required, at least 6 characters");
 
   return prisma.$transaction(async (tx) => {
     const marked = await tx.refund.updateMany({
-      where: { id: refundId, status: RefundStatus.PENDING, payoutMethodId: { not: null } },
+      where: {
+        id: refundId,
+        status: RefundStatus.PENDING,
+        payoutMethodId: { not: null },
+      },
       data: {
         status: RefundStatus.COMPLETED,
         transactionRef: ref,
@@ -455,7 +527,8 @@ export async function completePayout(refundId: string, adminId: string, transact
         failureReason: null,
       },
     });
-    if (marked.count === 0) return fail("Payout not found or not in PENDING status", 404);
+    if (marked.count === 0)
+      return fail("Payout not found or not in PENDING status", 404);
 
     const refund = await tx.refund.findUnique({
       where: { id: refundId },
@@ -473,15 +546,28 @@ export async function completePayout(refundId: string, adminId: string, transact
   });
 }
 
-export async function failPayout(refundId: string, adminId: string, reason: string) {
+export async function failPayout(
+  refundId: string,
+  adminId: string,
+  reason: string,
+) {
   const failureReason = String(reason ?? "").trim();
   if (!failureReason) return fail("reason is required");
 
   const marked = await prisma.refund.updateMany({
-    where: { id: refundId, status: RefundStatus.PENDING, payoutMethodId: { not: null } },
-    data: { status: RefundStatus.FAILED, failureReason, processedById: adminId },
+    where: {
+      id: refundId,
+      status: RefundStatus.PENDING,
+      payoutMethodId: { not: null },
+    },
+    data: {
+      status: RefundStatus.FAILED,
+      failureReason,
+      processedById: adminId,
+    },
   });
-  if (marked.count === 0) return fail("Payout not found or not in PENDING status", 404);
+  if (marked.count === 0)
+    return fail("Payout not found or not in PENDING status", 404);
 
   return prisma.refund.findUnique({ where: { id: refundId } });
 }

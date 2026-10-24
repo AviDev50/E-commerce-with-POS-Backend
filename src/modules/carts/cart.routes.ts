@@ -4,7 +4,7 @@ import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.j
 
 const router = Router();
 
-// Sab routes protected — sirf logged-in customer apna cart access kar sakta hai
+// all routes protected — only logged-in customer access their cart
 router.get("/", verifyCustomerToken, cartController.getCart);
 router.post("/items", verifyCustomerToken, cartController.addToCart);
 router.patch("/items/:id", verifyCustomerToken, cartController.updateCartItem);

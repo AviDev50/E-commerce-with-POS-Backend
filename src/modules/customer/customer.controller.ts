@@ -4,7 +4,7 @@ import * as customerService from "./customer.service.js";
 // ==================== REGISTER CUSTOMER ====================
 export async function registerCustomer(req: Request, res: Response) {
   try {
-    const { name, phone, email, password} = req.body;
+    const { name, phone, email, password } = req.body;
 
     if (!name || !phone || !password) {
       return res.status(400).json({
@@ -16,12 +16,16 @@ export async function registerCustomer(req: Request, res: Response) {
       name,
       phone,
       email,
-      password
+      password,
     });
 
-    return res.status(201).json({ message: "Customer registered successfully", data: customer });
+    return res
+      .status(201)
+      .json({ message: "Customer registered successfully", data: customer });
   } catch (error: any) {
-    return res.status(error.statusCode || 500).json({ message: error.message || "Something went wrong" });
+    return res
+      .status(error.statusCode || 500)
+      .json({ message: error.message || "Something went wrong" });
   }
 }
 
@@ -30,10 +34,15 @@ export async function loginCustomer(req: Request, res: Response) {
     const { phone, password } = req.body;
 
     if (!phone || !password) {
-      return res.status(400).json({ message: "phone and password are required" });
+      return res
+        .status(400)
+        .json({ message: "phone and password are required" });
     }
 
-    const result = await customerService.loginCustomerService({ phone, password });
+    const result = await customerService.loginCustomerService({
+      phone,
+      password,
+    });
     return res.status(200).json({ message: "Login successful", data: result });
   } catch (error: any) {
     return res.status(401).json({ message: error.message });
@@ -48,7 +57,8 @@ export async function refreshCustomerAccessToken(req: Request, res: Response) {
       return res.status(400).json({ message: "refreshToken is required" });
     }
 
-    const result = await customerService.refreshCustomerAccessTokenService(refreshToken);
+    const result =
+      await customerService.refreshCustomerAccessTokenService(refreshToken);
     return res.status(200).json({ message: "Token refreshed", data: result });
   } catch (error: any) {
     return res.status(401).json({ message: error.message });

@@ -9,7 +9,10 @@ export async function getReturnsExchangeReport(req: Request, res: Response) {
     if (type && !Object.values(ReturnType).includes(type as ReturnType)) {
       return res.status(400).json({ message: "Invalid type" });
     }
-    if (channel && !Object.values(OrderChannel).includes(channel as OrderChannel)) {
+    if (
+      channel &&
+      !Object.values(OrderChannel).includes(channel as OrderChannel)
+    ) {
       return res.status(400).json({ message: "Invalid channel" });
     }
 

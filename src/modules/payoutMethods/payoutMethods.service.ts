@@ -13,7 +13,12 @@ const LOCKING_RETURN_STATUSES: ReturnStatus[] = [
   ReturnStatus.RECEIVED,
 ];
 
-const toView = (m: { id: string; type: string; label: string | null; upiId: string }) => ({
+const toView = (m: {
+  id: string;
+  type: string;
+  label: string | null;
+  upiId: string;
+}) => ({
   id: m.id,
   type: m.type,
   label: m.label,
@@ -27,7 +32,11 @@ async function isLocked(methodId: string) {
       payoutMethodId: methodId,
       OR: [
         { status: { in: LOCKING_RETURN_STATUSES } },
-        { refund: { is: { status: { in: [RefundStatus.PENDING, RefundStatus.FAILED] } } } },
+        {
+          refund: {
+            is: { status: { in: [RefundStatus.PENDING, RefundStatus.FAILED] } },
+          },
+        },
       ],
     },
   });
@@ -38,8 +47,11 @@ export async function addPayoutMethodService(
   customerId: string,
   input: { upiId?: string; label?: string },
 ) {
-  const upiId = String(input.upiId ?? "").trim().toLowerCase();
-  if (!UPI_REGEX.test(upiId)) return fail("Invalid UPI ID (example: name@bank)");
+  const upiId = String(input.upiId ?? "")
+    .trim()
+    .toLowerCase();
+  if (!UPI_REGEX.test(upiId))
+    return fail("Invalid UPI ID (example: name@bank)");
   const label = input.label?.trim() || null;
 
   const existing = await prisma.payoutMethod.findUnique({
@@ -47,13 +59,18 @@ export async function addPayoutMethodService(
   });
   if (existing?.isActive) return fail("This UPI ID is already saved", 409);
 
-  const activeCount = await prisma.payoutMethod.count({ where: { customerId, isActive: true } });
+  const activeCount = await prisma.payoutMethod.count({
+    where: { customerId, isActive: true },
+  });
   if (activeCount >= MAX_PAYOUT_METHODS) {
     return fail(`You can save up to ${MAX_PAYOUT_METHODS} UPI IDs`);
   }
 
   const saved = existing
-    ? await prisma.payoutMethod.update({ where: { id: existing.id }, data: { isActive: true, label } })
+    ? await prisma.payoutMethod.update({
+        where: { id: existing.id },
+        data: { isActive: true, label },
+      })
     : await prisma.payoutMethod.create({ data: { customerId, upiId, label } });
 
   return toView(saved);
@@ -67,13 +84,18 @@ export async function listPayoutMethodsService(customerId: string) {
   return methods.map(toView);
 }
 
-export async function deletePayoutMethodService(customerId: string, id: string) {
+export async function deletePayoutMethodService(
+  customerId: string,
+  id: string,
+) {
   const method = await prisma.payoutMethod.findUnique({ where: { id } });
   if (!method || method.customerId !== customerId || !method.isActive) {
     return fail("Payout method not found", 404);
   }
   if (await isLocked(id)) {
-    return fail("This UPI ID is used in an active return/exchange request and cannot be deleted");
+    return fail(
+      "This UPI ID is used in an active return/exchange request and cannot be deleted",
+    );
   }
 
   // kabhi kisi request/refund mein use nahi hua to asli delete, warna soft delete (audit)
@@ -84,6 +106,9 @@ export async function deletePayoutMethodService(customerId: string, id: string) 
   if (requests + refunds === 0) {
     await prisma.payoutMethod.delete({ where: { id } });
   } else {
-    await prisma.payoutMethod.update({ where: { id }, data: { isActive: false } });
+    await prisma.payoutMethod.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 }

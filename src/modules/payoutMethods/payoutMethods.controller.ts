@@ -10,7 +10,9 @@ export async function addPayoutMethod(req: Request, res: Response) {
     });
     res.status(201).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
@@ -19,15 +21,22 @@ export async function listPayoutMethods(req: Request, res: Response) {
     const data = await service.listPayoutMethodsService(req.customer!.id);
     res.status(200).json({ success: true, data });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }
 
 export async function deletePayoutMethod(req: Request, res: Response) {
   try {
-    await service.deletePayoutMethodService(req.customer!.id, getParam(req.params.id));
+    await service.deletePayoutMethodService(
+      req.customer!.id,
+      getParam(req.params.id),
+    );
     res.status(200).json({ success: true, message: "Payout method deleted" });
   } catch (err: any) {
-    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
   }
 }

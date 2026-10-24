@@ -31,7 +31,9 @@ function getThumbnailUrl(images: string | null): string | null {
   if (!images) return null;
   try {
     const imagesArray: string[] = JSON.parse(images);
-    return Array.isArray(imagesArray) && imagesArray.length ? formatImageUrl(imagesArray[0]) : null;
+    return Array.isArray(imagesArray) && imagesArray.length
+      ? formatImageUrl(imagesArray[0])
+      : null;
   } catch {
     return null; // corrupted data — crash karne ki jagah null image dikhao
   }

@@ -33,7 +33,15 @@ async function buildCartResponse(cartId: string) {
     where: { cartId },
     include: {
       product: {
-        select: { id: true, name: true, slug: true, images: true, price: true, isActive: true, stock: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          images: true,
+          price: true,
+          isActive: true,
+          stock: true,
+        },
       },
       variant: {
         select: { id: true, sku: true, price: true, stock: true },
@@ -44,31 +52,35 @@ async function buildCartResponse(cartId: string) {
 
   let subtotal = 0;
 
-const mappedItems = items.map((item) => {
-  const unitPrice = item.variant ? Number(item.variant.price) : Number(item.product.price);
-  const availableStock = item.variant ? item.variant.stock : item.product.stock;
-  const lineTotal = unitPrice * item.quantity;
-  subtotal += lineTotal;
+  const mappedItems = items.map((item) => {
+    const unitPrice = item.variant
+      ? Number(item.variant.price)
+      : Number(item.product.price);
+    const availableStock = item.variant
+      ? item.variant.stock
+      : item.product.stock;
+    const lineTotal = unitPrice * item.quantity;
+    subtotal += lineTotal;
 
-  const rawImage = parseImages(item.product.images)[0];
-  const image = rawImage ? formatImageUrl(rawImage) : null;
+    const rawImage = parseImages(item.product.images)[0];
+    const image = rawImage ? formatImageUrl(rawImage) : null;
 
-  return {
-    id: item.id,
-    productId: item.product.id,
-    productName: item.product.name,
-    productSlug: item.product.slug,
-    image,
-    variantId: item.variant?.id || null,
-    variantSku: item.variant?.sku || null,
-    quantity: item.quantity,
-    unitPrice,
-    lineTotal,
-    availableStock,
-    isActive: item.product.isActive,
-    inStockEnough: availableStock >= item.quantity,
-  };
-});
+    return {
+      id: item.id,
+      productId: item.product.id,
+      productName: item.product.name,
+      productSlug: item.product.slug,
+      image,
+      variantId: item.variant?.id || null,
+      variantSku: item.variant?.sku || null,
+      quantity: item.quantity,
+      unitPrice,
+      lineTotal,
+      availableStock,
+      isActive: item.product.isActive,
+      inStockEnough: availableStock >= item.quantity,
+    };
+  });
 
   return {
     cartId,
@@ -83,7 +95,10 @@ export async function getCartService(customerId: string) {
   return buildCartResponse(cart.id);
 }
 
-export async function addToCartService(customerId: string, input: AddToCartInput) {
+export async function addToCartService(
+  customerId: string,
+  input: AddToCartInput,
+) {
   const { productId, variantId, quantity } = input;
 
   if (!productId || !quantity || quantity < 1) {
@@ -98,7 +113,9 @@ export async function addToCartService(customerId: string, input: AddToCartInput
   let availableStock = product.stock;
 
   if (variantId) {
-    const variant = await prisma.productVariant.findUnique({ where: { id: variantId } });
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+    });
     if (!variant || variant.productId !== productId) {
       throw new Error("Variant not found for this product");
     }
@@ -111,7 +128,9 @@ export async function addToCartService(customerId: string, input: AddToCartInput
     where: { cartId: cart.id, productId, variantId: variantId || null },
   });
 
-  const desiredQuantity = existingItem ? existingItem.quantity + quantity : quantity;
+  const desiredQuantity = existingItem
+    ? existingItem.quantity + quantity
+    : quantity;
 
   if (desiredQuantity > availableStock) {
     throw new Error(`Only ${availableStock} unit(s) available in stock`);
@@ -136,7 +155,11 @@ export async function addToCartService(customerId: string, input: AddToCartInput
   return buildCartResponse(cart.id);
 }
 
-export async function updateCartItemService(customerId: string, itemId: string, quantity: number) {
+export async function updateCartItemService(
+  customerId: string,
+  itemId: string,
+  quantity: number,
+) {
   if (!quantity || quantity < 1) {
     throw new Error("A valid quantity is required");
   }
@@ -163,7 +186,10 @@ export async function updateCartItemService(customerId: string, itemId: string, 
   return buildCartResponse(cart.id);
 }
 
-export async function removeCartItemService(customerId: string, itemId: string) {
+export async function removeCartItemService(
+  customerId: string,
+  itemId: string,
+) {
   const cart = await prisma.cart.findUnique({ where: { customerId } });
   if (!cart) throw new Error("Cart not found");
 
@@ -186,7 +212,7 @@ export async function clearCartService(customerId: string) {
   return buildCartResponse(cart.id);
 }
 
-// Razorpay flow ke liye — Cart se items nikaal ke OrderItemInput shape mein convert karna
+// for Razorpay flow ke liye — Cart se items nikaal ke OrderItemInput shape mein convert karna - pending - we change this soon
 export async function getCartAsOrderItemsService(customerId: string) {
   const cart = await prisma.cart.findUnique({
     where: { customerId },
