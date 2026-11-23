@@ -17,9 +17,10 @@ export async function requestCustomerOtp(req: Request, res: Response) {
     const result = await customerService.requestCustomerOtpService(phone);
     return res.status(200).json(result);
   } catch (error: any) {
-    return res
-      .status(error.statusCode || 500)
-      .json({ message: error.message || "Something went wrong" });
+    return res.status(error.statusCode || 500).json({
+      message: error.message || "Something went wrong",
+      ...(error.errorCode && { code: error.errorCode }),
+    });
   }
 }
 
@@ -49,12 +50,12 @@ export async function verifyCustomerOtp(req: Request, res: Response) {
     );
     return res.status(200).json({ message: "Login successful", data: result });
   } catch (error: any) {
-    return res
-      .status(error.statusCode || 401)
-      .json({ message: error.message });
+    return res.status(error.statusCode || 401).json({
+      message: error.message,
+      ...(error.errorCode && { code: error.errorCode }),
+    });
   }
 }
-
 // ==================== REGISTER CUSTOMER ====================
 export async function registerCustomer(req: Request, res: Response) {
   try {
