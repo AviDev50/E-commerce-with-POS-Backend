@@ -28,4 +28,7 @@ router.post("/login", customerController.loginCustomer);
 router.post("/refresh", customerController.refreshCustomerAccessToken);
 router.post("/logout", customerController.logoutCustomer);
 
+router.post("/otp/request", otpRequestLimiter, customerController.requestCustomerOtp);
+router.post("/otp/verify", otpVerifyLimiter, customerController.verifyCustomerOtp);
+
 export default router;
