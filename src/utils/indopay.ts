@@ -14,6 +14,17 @@ export async function sendOtpViaIndopay(
     const res = await fetch(url, { signal: ctrl.signal });
     const json: any = await res.json();
 
+    if (process.env.NODE_ENV !== "production") {
+  console.log(
+    "[indopay]",
+    "status:", json.status,
+    "| code:", json.error,
+    "| msg:", json.msg,
+    "| remaining:", json.remaining,
+    "| mode:", json.mode,
+  );
+}
+
     if (json.status !== "success" || !json.otp) {
       // URL log mat karna — usme merchant_key hai
       console.error("[indopay] send failed:", json.error, json.msg, json.remaining);
