@@ -736,3 +736,16 @@ model PosPage {
 
   @@map("pos_pages")
 }
+
+model OtpCode {
+  id         String   @id @default(uuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  consumed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@map("otp_codes")
+}
