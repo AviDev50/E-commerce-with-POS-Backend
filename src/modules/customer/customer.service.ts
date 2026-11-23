@@ -21,9 +21,10 @@ interface LoginInput {
   password: string;
 }
 
-function httpError(message: string, statusCode: number) {
+function httpError(message: string, statusCode: number, errorCode?: string) {
   const err: any = new Error(message);
   err.statusCode = statusCode;
+  if (errorCode) err.errorCode = errorCode;
   return err;
 }
 
@@ -166,8 +167,10 @@ export async function logoutCustomerService(rawRefreshToken: string) {
 /* ───────────────────────── OTP LOGIN / SIGNUP ───────────────────────── */
 
 const OTP_DIGITS = (Number(process.env.OTP_DIGITS) === 4 ? 4 : 6) as 4 | 6;
-const OTP_TTL_MS = Number(process.env.OTP_TTL_MINUTES || 5) * 60_000;
+const OTP_TTL_MS = Number(process.env.OTP_TTL_MINUTES || 2) * 60_000;
 const RESEND_COOLDOWN_MS = 60_000;
+const RESEND_COOLDOWN_SEC = RESEND_COOLDOWN_MS / 1000;
+const HOUR_MS = 3_600_000;
 const MAX_SENDS_PER_HOUR = 5;
 const MAX_VERIFY_ATTEMPTS = 5;
 
@@ -179,26 +182,49 @@ function hashOtp(phone: string, otp: string) {
 }
 
 export async function requestCustomerOtpService(phone: string) {
-  const generic = { message: "OTP sent if the number is valid." };
-
-  // Deactivated customer ko OTP mat bhejo (credits bachte hain)
+  // Deactivated customer ko OTP nahi (credits bachte hain)
   const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (customer && !customer.isActive) return generic;
+  if (customer && !customer.isActive) {
+    return { message: "Unable to send OTP to this number.", sent: false };
+  }
 
   const now = Date.now();
 
+  // 60s cooldown
   const last = await prisma.otpCode.findFirst({
     where: { phone },
     orderBy: { createdAt: "desc" },
   });
-  if (last && now - last.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-    return generic;
+  if (last) {
+    const elapsed = now - last.createdAt.getTime();
+    if (elapsed < RESEND_COOLDOWN_MS) {
+      return {
+        message: "Please wait before requesting another OTP.",
+        sent: false,
+        retryAfter: Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000),
+      };
+    }
   }
 
+  // Hourly cap
+  const windowStart = new Date(now - HOUR_MS);
   const sentLastHour = await prisma.otpCode.count({
-    where: { phone, createdAt: { gt: new Date(now - 3_600_000) } },
+    where: { phone, createdAt: { gt: windowStart } },
   });
-  if (sentLastHour >= MAX_SENDS_PER_HOUR) return generic;
+  if (sentLastHour >= MAX_SENDS_PER_HOUR) {
+    const oldest = await prisma.otpCode.findFirst({
+      where: { phone, createdAt: { gt: windowStart } },
+      orderBy: { createdAt: "asc" },
+    });
+    const retryAfter = oldest
+      ? Math.max(1, Math.ceil((oldest.createdAt.getTime() + HOUR_MS - now) / 1000))
+      : undefined;
+    return {
+      message: "Too many OTP requests. Try again later.",
+      sent: false,
+      retryAfter,
+    };
+  }
 
   const otp = await sendOtpViaIndopay(phone, OTP_DIGITS);
 
@@ -216,7 +242,7 @@ export async function requestCustomerOtpService(phone: string) {
     }),
   ]);
 
-  return generic;
+  return { message: "OTP sent.", sent: true, retryAfter: RESEND_COOLDOWN_SEC };
 }
 
 export async function verifyCustomerOtpService(
@@ -224,7 +250,7 @@ export async function verifyCustomerOtpService(
   otp: string,
   name?: string,
 ) {
-  const invalid = () => httpError("Invalid or expired OTP", 401);
+  const invalid = () => httpError("Invalid or expired OTP", 401, "INVALID_OTP");
 
   const record = await prisma.otpCode.findFirst({
     where: { phone, consumed: false },
@@ -249,18 +275,17 @@ export async function verifyCustomerOtpService(
   const b = Buffer.from(record.codeHash);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) throw invalid();
 
-  // OTP sahi hai — ab customer check (OTP consume hone se pehle,
-  // taaki naye user ko name bhejne par dobara OTP na lena pade)
   let customer = await prisma.customer.findUnique({ where: { phone } });
 
   if (customer && !customer.isActive) {
-    throw httpError("Your account has been deactivated.", 403);
+    throw httpError("Your account has been deactivated.", 403, "ACCOUNT_DEACTIVATED");
   }
   if (!customer && !name) {
-    throw httpError("name is required to create a new account", 400);
+    // OTP consume nahi hota, wahi OTP name ke saath dobara chalega
+    throw httpError("name is required to create a new account", 400, "NAME_REQUIRED");
   }
 
-  // Atomic consume — double use se bachne ke liye
+  // Atomic consume
   const { count } = await prisma.otpCode.updateMany({
     where: { id: record.id, consumed: false },
     data: { consumed: true },
@@ -273,7 +298,6 @@ export async function verifyCustomerOtpService(
         data: { name: name as string, phone },
       });
     } catch (e: any) {
-      // Parallel request ne already bana diya (phone @unique)
       if (e.code === "P2002") {
         customer = await prisma.customer.findUnique({ where: { phone } });
       } else {
