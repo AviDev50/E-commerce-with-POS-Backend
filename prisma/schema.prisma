@@ -749,3 +749,5 @@ model OtpCode {
   @@index([phone, createdAt])
   @@map("otp_codes")
 }
+
+websiteUrl String?   // e.g. https://mystore.com (white-label per-store domain)

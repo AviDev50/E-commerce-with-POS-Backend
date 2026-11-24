@@ -5,14 +5,14 @@ import { resolveTaxBreakdown } from "../../utils/taxCalculator.js";
 //import { formatImageUrl, formatImageUrls } from "../../utils/formatImageUrl";
 
 //Helperbina variants wala product, YA kam se kam 1 active variant wala
-const SELLABLE: Prisma.ProductWhereInput = {
+export const SELLABLE: Prisma.ProductWhereInput = {
   OR: [
     { variants: { none: {} } },
     { variants: { some: { isActive: true } } },
   ],
 };
 
-function parseImages(images: any): string[] {
+export function parseImages(images: any): string[] {
   if (Array.isArray(images)) return images;
   if (typeof images === "string") {
     try {
@@ -37,7 +37,7 @@ function computeDiscount(price: number, mrp: any) {
 }
 
 // displayPrice = sabse sasta variant/product — USI ka mrp/discount lena hai, kisi random variant ka nahi
-function resolvePricing(
+export function resolvePricing(
   basePrice: number,
   baseMrp: any,
   variants: { price: any; mrp: any }[],

@@ -41,6 +41,7 @@ import razorpayRoutes from "./modules/razorpay/razorpay.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import payoutMethodsRoutes from "./modules/payoutMethods/payoutMethods.routes.js";
 import posPageRoutes from "./modules/pos-page/pos-page.routes.js";
+import websiteShareRoutes, { sharePageRoutes } from "./modules/websiteShare/websiteShare.routes.js";
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -82,7 +83,7 @@ app.use("/api/v1/settings", settingsRoutes);
 app.use("/api/v1/permissions", permissionRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
-app.use("/api/v1/customer", customerRoutes);
+app.use("/api/v1/customer", customerRoutes);          //request and verify otp api and their helpers are present here
 app.use("/api/v1/banners", bannerRoutes);
 app.use("/api/v1/tax", taxRoutes);
 app.use("/api/v1/customer/profile", customerProfileRoutes);
@@ -101,6 +102,7 @@ app.use("/api/v1/website/returns", websiteReturnsRoutes);
 app.use("/api/v1/website/support", websiteSupportRoutes);
 app.use("/api/v1/website/pages", websitePageRoutes);
 app.use("/api/v1/website/search", websiteSearchRoutes);
+app.use("/api/v1/website/share", websiteShareRoutes);
 app.use("/api/v1/website/payments/razorpay", razorpayRoutes);
 app.use("/api/v1/website/wallet", walletRoutes);
 app.use("/api/v1/payout-methods", payoutMethodsRoutes);
@@ -111,6 +113,8 @@ app.use("/api/v1/pos/reports", reportsRoutes);
 app.use("/api/v1/pos/shifts", shiftRoutes);
 app.use("/api/v1/pos/held-orders", heldOrderRoutes);
 app.use("/api/v1/pos-pages", posPageRoutes);
+//public share pages (no auth) — link preview ke liye HTML
+app.use("/share", sharePageRoutes);
 
 // Start Server
 app.listen(PORT, () => {
