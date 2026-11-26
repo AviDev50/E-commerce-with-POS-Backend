@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Razorpay Checkout Test</title>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
@@ -10,7 +11,8 @@
     .step { border: 1px solid #ccc; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
     .step h4 { margin-top: 0; }
     label { display: block; font-size: 13px; color: #555; margin-top: 8px; }
-    input { width: 100%; padding: 8px; margin-top: 3px; box-sizing: border-box; }
+    input[type=text], textarea { width: 100%; padding: 8px; margin-top: 3px; box-sizing: border-box; font-family: inherit; }
+    textarea { font-family: monospace; font-size: 12px; height: 110px; }
     button {
       padding: 10px 16px; margin-top: 12px; cursor: pointer;
       background: #075e54; color: white; border: none; border-radius: 5px; font-size: 14px;
@@ -23,47 +25,71 @@
     .status { font-weight: bold; padding: 4px 0; }
     .ok { color: green; }
     .err { color: red; }
+    .warn { color: #b36b00; }
+    .cartRow { display: flex; gap: 8px; align-items: center; font-size: 13px; padding: 4px 0; }
+    .mode label { display: inline; margin-right: 14px; color: #000; }
   </style>
 </head>
 <body>
 
   <h3>Razorpay Checkout — Test Page</h3>
-  <p style="color:#666; font-size:13px;">Yeh sirf local testing ke liye hai — production mein use mat karo. Backend server chalu hona chahiye.</p>
+  <p style="color:#666; font-size:13px;">Sirf testing ke liye, production mein use mat karo.</p>
 
-  <!-- Config -->
+  <!-- 1. Config -->
   <div class="step">
     <h4>1. Config</h4>
     <label>Base URL (backend)</label>
-    <input id="baseUrl" value="http://localhost:5000" />
+    <input type="text" id="baseUrl" value="https://fcmart.fctesting.space" />
 
-    <label>Customer Token (Bearer, login se milega)</label>
-    <input id="customerToken" placeholder="eyJhbGciOi..." />
+    <label>Customer Token (Bearer)</label>
+    <input type="text" id="customerToken" placeholder="eyJhbGciOi..." />
 
-    <label>Address ID (customer ka apna address)</label>
-    <input id="addressId" placeholder="address-uuid-here" />
+    <label>Address ID</label>
+    <input type="text" id="addressId" placeholder="address-uuid" />
 
     <label>Coupon Code (optional)</label>
-    <input id="couponCode" placeholder="SAVE10" />
+    <input type="text" id="couponCode" placeholder="WELCOME10" />
   </div>
 
-  <!-- Step 1: Create Order -->
+  <!-- 2. Items -->
   <div class="step">
-    <h4>2. Create Razorpay Order</h4>
-    <p style="font-size:13px; color:#666;">Customer ke Cart se items automatically fetch honge backend se — yahan kuch add karne ki zaroorat nahi, pehle Cart mein items daal lena Postman/app se.</p>
+    <h4>2. Items</h4>
+    <div class="mode">
+      <label><input type="radio" name="mode" value="cart" checked onchange="switchMode()"> Cart se (selected items + cartItemIds)</label>
+      <label><input type="radio" name="mode" value="buynow" onchange="switchMode()"> Buy Now (manual JSON, cartItemIds nahi)</label>
+    </div>
+
+    <div id="cartMode">
+      <button onclick="loadCart()">Load my cart</button>
+      <div id="cartList" style="margin-top:8px;"></div>
+      <div id="cartStatus" class="status"></div>
+    </div>
+
+    <div id="buyNowMode" style="display:none;">
+      <label>items (JSON array)</label>
+      <textarea id="manualItems">[
+  { "productId": "PRODUCT_ID", "variantId": "VARIANT_ID", "quantity": 1 }
+]</textarea>
+    </div>
+  </div>
+
+  <!-- 3. Create order -->
+  <div class="step">
+    <h4>3. Create Razorpay Order</h4>
     <button onclick="createOrder()">Create Order</button>
     <div id="createOrderResult" class="status"></div>
   </div>
 
-  <!-- Step 2: Pay -->
+  <!-- 4. Pay -->
   <div class="step">
-    <h4>3. Open Razorpay Checkout</h4>
+    <h4>4. Open Razorpay Checkout</h4>
     <button id="payBtn" onclick="openCheckout()" disabled>Pay Now</button>
     <div id="payResult" class="status"></div>
   </div>
 
-  <!-- Step 3: Verify -->
+  <!-- 5. Verify -->
   <div class="step">
-    <h4>4. Verify Result</h4>
+    <h4>5. Verify Result</h4>
     <div id="verifyResult" class="status"></div>
   </div>
 
@@ -75,12 +101,19 @@
 
   <script>
     let currentOrder = null; // { razorpayOrderId, amount, currency, keyId }
+    let cartItems = [];      // GET cart response items
 
     function log(msg, obj) {
       const el = document.getElementById("log");
       const line = obj ? `${msg}\n${JSON.stringify(obj, null, 2)}\n` : `${msg}\n`;
       el.textContent += line + "\n";
       el.scrollTop = el.scrollHeight;
+    }
+
+    function setStatus(id, text, cls) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = "status " + (cls || "");
     }
 
     function getConfig() {
@@ -92,23 +125,106 @@
       };
     }
 
-    async function createOrder() {
-      const { baseUrl, token, addressId, couponCode } = getConfig();
-      const resultEl = document.getElementById("createOrderResult");
+    function getMode() {
+      return document.querySelector('input[name="mode"]:checked').value;
+    }
 
-      if (!token || !addressId) {
-        resultEl.textContent = "Token aur Address ID dono zaroori hain";
-        resultEl.className = "status err";
-        return;
+    function switchMode() {
+      const cart = getMode() === "cart";
+      document.getElementById("cartMode").style.display = cart ? "block" : "none";
+      document.getElementById("buyNowMode").style.display = cart ? "none" : "block";
+    }
+
+    async function loadCart() {
+      const { baseUrl, token } = getConfig();
+      if (!token) return setStatus("cartStatus", "Token zaroori hai", "err");
+
+      setStatus("cartStatus", "Loading cart...", "");
+      try {
+        const res = await fetch(`${baseUrl}/api/v1/website/cart`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        log("GET /website/cart response:", data);
+
+        if (!res.ok) return setStatus("cartStatus", `Error: ${data.message}`, "err");
+
+        const body = data.data || data;
+        cartItems = body.items || [];
+        const list = document.getElementById("cartList");
+        list.textContent = "";
+
+        if (cartItems.length === 0) {
+          return setStatus("cartStatus", "Cart khaali hai", "warn");
+        }
+
+        cartItems.forEach((it, idx) => {
+          const row = document.createElement("div");
+          row.className = "cartRow";
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = true;
+          cb.dataset.idx = idx;
+          const txt = document.createElement("span");
+          txt.textContent = `${it.productName}${it.variantSku ? " [" + it.variantSku + "]" : ""} × ${it.quantity} — ₹${it.lineTotal}`;
+          row.appendChild(cb);
+          row.appendChild(txt);
+          list.appendChild(row);
+        });
+        setStatus("cartStatus", `${cartItems.length} item(s) loaded. Jo checkout karna hai wahi tick rakho.`, "ok");
+      } catch (err) {
+        setStatus("cartStatus", `Network error: ${err.message}`, "err");
+      }
+    }
+
+    // Mode ke hisaab se { items, cartItemIds? } banata hai
+    function buildItemsPayload() {
+      if (getMode() === "buynow") {
+        let items;
+        try {
+          items = JSON.parse(document.getElementById("manualItems").value);
+        } catch (e) {
+          throw new Error("Manual items valid JSON nahi hai");
+        }
+        if (!Array.isArray(items) || items.length === 0) throw new Error("items array khaali hai");
+        return { items }; // cartItemIds nahi bhejna
       }
 
-      resultEl.textContent = "Creating order...";
-      resultEl.className = "status";
+      const checked = [...document.querySelectorAll('#cartList input[type=checkbox]:checked')]
+        .map((cb) => cartItems[Number(cb.dataset.idx)]);
+      if (checked.length === 0) throw new Error("Cart se kam se kam ek item select karo (pehle Load my cart)");
+
+      return {
+        items: checked.map((it) => {
+          const o = { productId: it.productId, quantity: it.quantity };
+          if (it.variantId) o.variantId = it.variantId;
+          return o;
+        }),
+        cartItemIds: checked.map((it) => it.id),
+      };
+    }
+
+    async function createOrder() {
+      const { baseUrl, token, addressId, couponCode } = getConfig();
+
+      if (!token || !addressId) {
+        return setStatus("createOrderResult", "Token aur Address ID dono zaroori hain", "err");
+      }
+
+      let payload;
+      try {
+        payload = buildItemsPayload();
+      } catch (e) {
+        return setStatus("createOrderResult", e.message, "err");
+      }
+
+      const body = { ...payload, addressId };
+      if (couponCode) body.couponCode = couponCode;
+
+      setStatus("createOrderResult", "Creating order...", "");
+      log("POST /razorpay/create-order request:", body);
 
       try {
-        const body = { addressId };
-        if (couponCode) body.couponCode = couponCode;
-
         const res = await fetch(`${baseUrl}/api/v1/website/payments/razorpay/create-order`, {
           method: "POST",
           headers: {
@@ -122,42 +238,40 @@
         log("POST /razorpay/create-order response:", data);
 
         if (!res.ok) {
-          resultEl.textContent = `Error: ${data.message}`;
-          resultEl.className = "status err";
-          return;
+          return setStatus("createOrderResult", `Error (${res.status}): ${data.message}`, "err");
         }
 
         currentOrder = data.data;
-        resultEl.textContent = `Order created — ₹${currentOrder.amount} (${currentOrder.razorpayOrderId})`;
-        resultEl.className = "status ok";
+        setStatus(
+          "createOrderResult",
+          `Order created — ₹${Number(currentOrder.amount).toFixed(2)} (${currentOrder.razorpayOrderId})`,
+          "ok"
+        );
         document.getElementById("payBtn").disabled = false;
       } catch (err) {
-        resultEl.textContent = `Network error: ${err.message}`;
-        resultEl.className = "status err";
+        setStatus("createOrderResult", `Network error: ${err.message}`, "err");
         log("create-order error:", { error: err.message });
       }
     }
 
     function openCheckout() {
       if (!currentOrder) return;
-      const { baseUrl, token } = getConfig();
 
       const options = {
         key: currentOrder.keyId,
-        amount: Math.round(currentOrder.amount * 100), // paise
+        amount: Math.round(currentOrder.amount * 100), // rupees -> paise
         currency: currentOrder.currency,
         order_id: currentOrder.razorpayOrderId,
         name: "Test Store",
         description: "Test Checkout",
-        // Test mode mein Razorpay ka test card use karo: 4111 1111 1111 1111, koi bhi future date, koi bhi CVV
+        // Test card: 4111 1111 1111 1111, koi bhi future date, koi bhi CVV | UPI: success@razorpay
         handler: async function (response) {
-          log("Razorpay success callback:", response);
+          log("Razorpay success callback:", response); // teeno values yahin dikhengi
           await verifyPayment(response);
         },
         modal: {
           ondismiss: function () {
-            document.getElementById("payResult").textContent = "Checkout band kar diya gaya (payment cancel)";
-            document.getElementById("payResult").className = "status err";
+            setStatus("payResult", "Checkout band kar diya gaya (payment cancel)", "err");
           },
         },
         theme: { color: "#075e54" },
@@ -167,8 +281,7 @@
 
       rzp.on("payment.failed", function (response) {
         log("Razorpay payment.failed:", response.error);
-        document.getElementById("payResult").textContent = `Payment failed: ${response.error.description}`;
-        document.getElementById("payResult").className = "status err";
+        setStatus("payResult", `Payment failed: ${response.error.description}`, "err");
       });
 
       rzp.open();
@@ -176,9 +289,7 @@
 
     async function verifyPayment(razorpayResponse) {
       const { baseUrl, token } = getConfig();
-      const verifyEl = document.getElementById("verifyResult");
-      verifyEl.textContent = "Verifying...";
-      verifyEl.className = "status";
+      setStatus("verifyResult", "Verifying...", "");
 
       try {
         const res = await fetch(`${baseUrl}/api/v1/website/payments/razorpay/verify`, {
@@ -195,19 +306,33 @@
         });
 
         const data = await res.json();
-        log("POST /razorpay/verify response:", data);
+        log(`POST /razorpay/verify response (${res.status}):`, data);
 
+        if (res.status === 409) {
+          return setStatus(
+            "verifyResult",
+            `Payment hua par order nahi bana, refund aayega: ${data.message}`,
+            "warn"
+          );
+        }
         if (!res.ok) {
-          verifyEl.textContent = `Verify failed: ${data.message}`;
-          verifyEl.className = "status err";
-          return;
+          return setStatus("verifyResult", `Verify failed (${res.status}): ${data.message}`, "err");
         }
 
-        verifyEl.textContent = `Order placed! Order #${data.data.orderNumber} — Total ₹${data.data.total}`;
-        verifyEl.className = "status ok";
+        setStatus(
+          "verifyResult",
+          `Order placed! Order #${data.data.orderNumber} — Total ₹${data.data.total}`,
+          "ok"
+        );
+        document.getElementById("payBtn").disabled = true;
+        currentOrder = null;
       } catch (err) {
-        verifyEl.textContent = `Network error: ${err.message}`;
-        verifyEl.className = "status err";
+        // network error pe "failed" nahi — paisa kat chuka ho sakta hai, webhook order bana dega
+        setStatus(
+          "verifyResult",
+          `Network error: ${err.message}. Payment processing ho sakti hai — orders list check karo.`,
+          "warn"
+        );
         log("verify error:", { error: err.message });
       }
     }
@@ -215,5 +340,3 @@
 
 </body>
 </html>
-
-//https://madhu.fctesting.shop/rzp_test.html
