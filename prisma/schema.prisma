@@ -110,6 +110,12 @@ enum WalletTxnType {
   DEBIT
 }
 
+enum CheckoutStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -750,4 +756,23 @@ model OtpCode {
   @@map("otp_codes")
 }
 
-websiteUrl String?   // e.g. https://mystore.com (white-label per-store domain)
+model PendingCheckout {
+  id             String         @id @default(uuid())
+  customerId     String
+  addressId      String
+  couponCode     String?
+  items          Json           // [{ productId, variantId?, quantity }]
+  cartItemIds    Json?
+  expectedTotal  Decimal        @db.Decimal(10, 2)
+  gatewayOrderId String         @unique
+  status         CheckoutStatus @default(PENDING)
+  orderId        String?
+  failureReason  String?        @db.Text
+  refundId       String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([customerId])
+  @@index([status, createdAt])
+  @@map("pending_checkouts")
+}
