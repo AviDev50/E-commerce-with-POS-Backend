@@ -110,6 +110,15 @@ export async function addToCartService(
     throw new Error("Product not found or inactive");
   }
 
+  if (!variantId) {
+    const variantCount = await prisma.productVariant.count({
+      where: { productId },
+    });
+    if (variantCount > 0) {
+      throw new Error(`Please select a variant for: ${product.name}`);
+    }
+  }
+
   let availableStock = product.stock;
 
   if (variantId) {
@@ -118,6 +127,9 @@ export async function addToCartService(
     });
     if (!variant || variant.productId !== productId) {
       throw new Error("Variant not found for this product");
+    }
+    if (!variant.isActive) {
+      throw new Error("This variant is currently unavailable");
     }
     availableStock = variant.stock;
   }
