@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as orderService from "./order.service.js";
+import { canDownloadInvoice } from "../invoice/invoice.service.js";
 import { hasPermission } from "../../middlewares/permission.middleware.js";
 
 export async function createPosOrder(req: Request, res: Response) {
@@ -103,7 +104,13 @@ export async function getAllOrders(req: Request, res: Response) {
     // Customer sirf apne orders dekhega, staff sab dekhega
     const filters = req.customer ? { customerId: req.customer.id } : {};
     const orders = await orderService.getAllOrdersService(filters);
-    return res.status(200).json({ data: orders });
+    const viewer = { isCustomer: !!req.customer };
+    return res.status(200).json({
+      data: orders.map((o) => ({
+        ...o,
+        canDownloadInvoice: canDownloadInvoice(o, viewer),
+      })),
+    });
   } catch (error: any) {
     return res.status(500).json({ message: error.message });
   }
@@ -131,7 +138,14 @@ export async function getOrderById(req: Request, res: Response) {
       }
     }
 
-    return res.status(200).json({ data: order });
+    return res.status(200).json({
+      data: {
+        ...order,
+        canDownloadInvoice: canDownloadInvoice(order, {
+          isCustomer: !!req.customer,
+        }),
+      },
+    });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
   }
@@ -151,7 +165,7 @@ export async function updateOrderStatus(req: Request, res: Response) {
       .status(200)
       .json({ message: "Order status updated", data: order });
   } catch (error: any) {
-    return res.status(400).json({ message: error.message });
+    return res.status(error.statusCode || 400).json({ message: error.message });
   }
 }
 

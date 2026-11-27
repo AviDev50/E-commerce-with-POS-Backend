@@ -223,6 +223,7 @@ model Product {
   category          Category? @relation(fields: [categoryId], references: [id])
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  hsnCode           String? @db.VarChar(8)
 
   variants         ProductVariant[]
   orderItems       OrderItem[]
@@ -313,6 +314,7 @@ model Order {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deliveredAt DateTime?
+  invoice     Invoice?
 
   orderItems             OrderItem[]
   payments               Payment[]
@@ -414,6 +416,9 @@ model StoreSettings {
   currency         String   @default("INR")
   updatedAt        DateTime @updatedAt
   returnWindowDays Int      @default(7)
+  legalName        String?
+  gstin            String? @db.VarChar(15)
+  invoicePrefix    String  @default("INV") @db.VarChar(3)
 
   @@map("store_settings")
 }
@@ -775,4 +780,23 @@ model PendingCheckout {
   @@index([customerId])
   @@index([status, createdAt])
   @@map("pending_checkouts")
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id])
+  invoiceNumber String   @unique @db.VarChar(16)
+  financialYear String   @db.VarChar(7)
+  snapshot      Json
+  issuedAt      DateTime @default(now())
+
+  @@map("invoices")
+}
+
+model InvoiceCounter {
+  financialYear String @id @db.VarChar(7)
+  lastNumber    Int    @default(0)
+
+  @@map("invoice_counters")
 }
