@@ -20,6 +20,7 @@ import {
   quoteExchange,
   deductStock,
 } from "../order/order.service.js";
+import { createInvoiceTx } from "../invoice/invoice.service.js";
 
 // Explicit ReturnStatus[] typing — warna TS inline array literal ko
 // narrow ("REQUESTED"|"APPROVED")[] type de deta hai aur .includes() mismatch deta hai
@@ -433,6 +434,9 @@ export async function processExchange(id: string, adminId: string) {
         settlement,
       },
     });
+
+    // exchange order seedha PROCESSING mein banta hai; returnRequest link hone ke BAAD invoice
+    await createInvoiceTx(tx, exchangeOrder.id);
 
     return exchangeOrder;
   });

@@ -18,6 +18,7 @@ import {
   PENDING_RETURN_STATUSES,
 } from "../../utils/returnPolicy.js";
 import { creditWalletTx, debitWalletTx } from "../wallet/wallet.service.js";
+import { createInvoiceTx } from "../invoice/invoice.service.js";
 
 interface OrderItemInput {
   productId: string;
@@ -681,6 +682,7 @@ export async function getAllOrdersService(filters: { customerId?: string }) {
       },
       payments: true, // FIX: "payment" → "payments"
       customer: { select: { id: true, name: true, phone: true, email: true } },
+      invoice: { select: { invoiceNumber: true, issuedAt: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -716,6 +718,7 @@ export async function getOrderByIdService(id: string) {
       customer: { select: { id: true, name: true, phone: true, email: true } },
       address: true,
       refunds: true,
+      invoice: { select: { invoiceNumber: true, issuedAt: true } },
     },
   });
 
@@ -740,29 +743,59 @@ export async function getOrderByIdService(id: string) {
   };
 }
 
+// admin PATCH /:id/status se allowed transitions
+const STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ["PROCESSING", "COMPLETED", "CANCELLED"],
+  PROCESSING: ["COMPLETED", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: [],
+  REFUNDED: [],
+};
+
 export async function updateOrderStatusService(id: string, status: string) {
-  const order = await prisma.order.findUnique({ where: { id } });
-  if (!order) {
-    const error: any = new Error("Order not found");
-    error.statusCode = 404;
-    throw error;
-  }
-
   if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
-    const error: any = new Error(`Invalid order status: ${status}`);
-    error.statusCode = 400;
-    throw error;
+    return fail(`Invalid order status: ${status}`);
+  }
+  const nextStatus = status as OrderStatus;
+
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) return fail("Order not found", 404);
+
+  if (!STATUS_TRANSITIONS[order.status].includes(nextStatus)) {
+    return fail(`Cannot change status from ${order.status} to ${nextStatus}`);
   }
 
-  const data: any = { status: status as OrderStatus };
+  return prisma.$transaction(async (tx) => {
+    // guarded update: beech mein status badal gaya ho to overwrite nahi hoga
+    const marked = await tx.order.updateMany({
+      where: { id, status: order.status },
+      data: {
+        status: nextStatus,
+        ...(nextStatus === "COMPLETED" && !order.deliveredAt
+          ? { deliveredAt: new Date() }
+          : {}),
+      },
+    });
+    if (marked.count === 0) {
+      return fail("Order was just updated. Please refresh.", 409);
+    }
 
-  if (status === OrderStatus.COMPLETED && !order.deliveredAt) {
-    data.deliveredAt = new Date();
-  }
+    // COD ka paisa delivery par milta hai
+    if (nextStatus === "COMPLETED") {
+      await tx.payment.updateMany({
+        where: { orderId: id, method: "COD", status: "PENDING" },
+        data: { status: "PAID" },
+      });
+    }
 
-  return prisma.order.update({
-    where: { id },
-    data,
+    if (
+      order.channel === "ONLINE" &&
+      (nextStatus === "PROCESSING" || nextStatus === "COMPLETED")
+    ) {
+      await createInvoiceTx(tx, id); // pehle se bana ho to wahi rahega
+    }
+
+    return tx.order.findUniqueOrThrow({ where: { id } });
   });
 }
 
