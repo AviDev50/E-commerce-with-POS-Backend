@@ -4,6 +4,7 @@ import { verifyToken } from "../../middlewares/auth.middleware.js";
 import { verifyCustomerToken } from "../../middlewares/customerAuth.middleware.js";
 import { verifyAnyToken } from "../../middlewares/anyAuth.middleware.js";
 import { checkPermission } from "../../middlewares/permission.middleware.js";
+import * as invoiceController from "../invoice/invoice.controller.js";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.post(
 );
 
 router.get("/:id/receipt", verifyAnyToken, orderController.getOrderReceipt);
+router.get("/:id/invoice", verifyAnyToken, invoiceController.downloadInvoice);
 
 // Shared — staff ya customer dono access kar sakte hain (controller ke andar filter/authorize hota hai)
 router.get("/", verifyAnyToken, orderController.getAllOrders);
